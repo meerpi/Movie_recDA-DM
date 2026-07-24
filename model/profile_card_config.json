@@ -1,0 +1,42 @@
+{
+  "schema": {
+    "type": "object",
+    "properties": {
+      "themes": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Key thematic topics explored in the movie, strictly grounded in the plot or reviews."
+      },
+      "tone": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Adjectives describing the emotional feel and stylistic atmosphere of the movie."
+      },
+      "pacing": {
+        "type": "string",
+        "enum": ["slow-paced", "moderate", "fast-paced"],
+        "description": "Tempo of the narrative flow as mentioned or implied in the reviews/plot."
+      },
+      "notable_criticisms": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Common negative feedback points or complaints from critic or audience reviews (empty list if none)."
+      },
+      "comparable_films": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Titles of comparable movies mentioned in the reviews/plot (empty list if none)."
+      }
+    },
+    "required": ["themes", "tone", "pacing", "notable_criticisms", "comparable_films"]
+  },
+  "prompt_template": "You are a movie analysis assistant. Your task is to generate a structured profile card for a movie based ONLY on the provided movie details (plot, critic review, and audience reviews).\n\nDO NOT hallucinate or use external knowledge. Every entry must be grounded in the text. If a property (like comparable films or criticisms) is not supported by the text, return an empty list or appropriate null values as per the schema.\n\n### MOVIE DATA\nTitle: {title}\nYear: {year}\n\n[PLOT SUMMARY]\n{plot}\n\n[CRITIC REVIEW]\n{critic_review}\n\n[AUDIENCE REVIEWS]\n{audience_reviews}\n\n### TWO-PASS INSTRUCTIONS\n\nPass 1: Grounded Evidence Extraction\nExtract raw quotes, snippets, or direct summaries from the provided texts for each field:\n- Themes: Find quotes showing thematic ideas.\n- Tone: Find words describing the mood/atmosphere.\n- Pacing: Find mentions of tempo/narrative speed.\n- Criticisms: Find negative feedback or critique points.\n- Comparable Films: Find mentions of similar/comparable movies.\n\nPass 2: JSON Generation\nProduce a single JSON block containing the structured profile card matching the schema below. Do not wrap the JSON in markdown code blocks. Ensure all list items are strings.\n\nJSON Schema:\n{\n  \"themes\": [\"string\"],\n  \"tone\": [\"string\"],\n  \"pacing\": \"slow-paced\" | \"moderate\" | \"fast-paced\",\n  \"notable_criticisms\": [\"string\"],\n  \"comparable_films\": [\"string\"]\n}"
+}

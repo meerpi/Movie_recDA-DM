@@ -1,0 +1,32 @@
+# Virtual environment & Environment variables
+.venv/
+venv/
+.env
+.tmp/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Databases
+db/
+*.db
+*.sqlite
+*.sqlite3
+*.duckdb
+
+# Tests, benchmarks, scratch, waste
+test_*.py
+*_test.py
+scratch/
+waste/
+
+# Large datasets, data dumps, and generated model/index artifacts
+data/
+*.jsonl
+*.csv
+*.zip
+*.tar.gz
+*.bak
+*.hnsw
+*.pkl
+*.npy
