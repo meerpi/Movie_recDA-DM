@@ -1,4 +1,4 @@
-# Virtual environment & Environment variables
+# Virtual environment & credentials
 .venv/
 venv/
 .env
@@ -6,6 +6,8 @@ venv/
 .pytest_cache/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
 # Databases
 db/
@@ -14,19 +16,27 @@ db/
 *.sqlite3
 *.duckdb
 
-# Tests, benchmarks, scratch, waste
-test_*.py
-*_test.py
-scratch/
-waste/
+# ── dirtywork/ ────────────────────────────────────────────────────────────────
+# Contains: raw JSONL profile cards, binary index artifacts, one-off build
+# scripts, scrapers, raw datasets, archives, and exploration notebooks.
+# Nothing in dirtywork/ belongs in source control.
+dirtywork/
 
-# Large datasets, data dumps, and generated model/index artifacts
-data/
+# Large binary / generated index artifacts (if ever outside dirtywork/)
+*.hnsw
+*.pkl
+*.npy
+
+# Large data dumps
 *.jsonl
 *.csv
 *.zip
 *.tar.gz
 *.bak
-*.hnsw
-*.pkl
-*.npy
+
+# Misc tooling
+.DS_Store
+*.log
+
+# Eval runtime artifacts
+eval/qul_cache.json
