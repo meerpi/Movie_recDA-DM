@@ -33,11 +33,15 @@ from eval.harness import evaluate_user, load_embedding_from_db
 from nlp.pipeline import CineVaultPipeline
 from nlp.scorer import score_candidates
 from nlp.ltr_scorer import score_candidates_ltr, load_ltr_model
+from nlp.retrieval_augment import entity_backstop, FallbackDenseRetriever
+
+FALLBACK_INDEX_PATH = PROJECT_ROOT / "dirtywork" / "fallback_dense.hnsw"
+
 
 LTR_MODEL_PATH = PROJECT_ROOT / "model" / "ltr_model.ubj"
 
 
-def run_retrieve_and_rerank(pipeline, profile, query, candidates_k=250, use_voyage=True):
+def run_retrieve_and_rerank(pipeline, profile, query, candidates_k=500, use_voyage=True, _fallback_retriever=None):
     """
     Runs the pipeline up to and including the reranking step.
     Returns (retrieved_ids, reranked_candidates) without scoring.
@@ -57,18 +61,48 @@ def run_retrieve_and_rerank(pipeline, profile, query, candidates_k=250, use_voya
 
     bm25_query_str = " ".join(bm25_keywords) if bm25_keywords else None
 
+    # Fix 1: raise lane_k 100→200 for 2x per-lane recall
     search_hits = pipeline.retriever.search(
-        expanded_query, top_k=candidates_k, use_voyage=use_voyage, bm25_query=bm25_query_str
+        expanded_query, top_k=candidates_k, lane_k=200,
+        use_voyage=use_voyage, bm25_query=bm25_query_str
     )
-    retrieved_ids = [h["movie_id"] for h in search_hits]
+    retrieved_ids_set = {h["movie_id"] for h in search_hits}
+
+    # Fix 2: profile-entity SQL backstop (directors / actors)
+    backstop_hits = entity_backstop(
+        profile, db_path=pipeline.db_path,
+        already_retrieved=retrieved_ids_set,
+        n_directors=3, n_actors=5, max_per_entity=20,
+    )
+    search_hits = search_hits + backstop_hits
+    retrieved_ids_set = {h["movie_id"] for h in search_hits}
+
+    # Fix 3: local fallback dense retrieval (sentence-transformer 384-dim index)
+    if _fallback_retriever is not None:
+        fallback_hits = _fallback_retriever.search(
+            query=expanded_query,
+            already_retrieved=retrieved_ids_set,
+            top_k=50,
+        )
+        search_hits = search_hits + fallback_hits
+        retrieved_ids_set = {h["movie_id"] for h in search_hits}
+
+    retrieved_ids = list(retrieved_ids_set)
 
     if not search_hits:
         return retrieved_ids, [], expanded_query, is_obscure_intent
 
     hydrated = pipeline.hydrator.hydrate(search_hits)
 
-    to_rerank = hydrated[:100]
-    remaining = hydrated[100:]
+    # Still send only top 100 (by rrf_score) to the expensive cross-encoder
+    # Rerank top 250 candidates (including entity backstop hits)
+    # Entity backstop items are prioritized for reranking if they match director/actor affinities
+    entity_hits = [c for c in hydrated if any(l in c.get("lanes", []) for l in ("entity_director", "entity_actor", "fallback_dense"))]
+    regular_hits = [c for c in hydrated if c not in entity_hits]
+    
+    # Rerank up to 200 regular hits + all entity/fallback hits
+    to_rerank = regular_hits[:200] + entity_hits
+    remaining = regular_hits[200:]
     reranked_top = pipeline.reranker.rerank(
         query=expanded_query, candidates=to_rerank, top_k=len(to_rerank)
     )
@@ -79,7 +113,7 @@ def run_retrieve_and_rerank(pipeline, profile, query, candidates_k=250, use_voya
     return retrieved_ids, reranked_candidates, expanded_query, is_obscure_intent
 
 
-def run_both_scorers(pipeline, profile, query, ltr_model, top_k=10, candidates_k=250):
+def run_both_scorers(pipeline, profile, query, ltr_model, top_k=10, candidates_k=500, _fallback_retriever=None):
     """
     Returns:
         retrieved_ids         — for Recall@100 (same for both scorers)
@@ -88,7 +122,8 @@ def run_both_scorers(pipeline, profile, query, ltr_model, top_k=10, candidates_k
         rerank_score_by_id    — for test-item diagnostics (same for both)
     """
     retrieved_ids, reranked_candidates, expanded_query, is_obscure_intent = \
-        run_retrieve_and_rerank(pipeline, profile, query, candidates_k=candidates_k)
+        run_retrieve_and_rerank(pipeline, profile, query, candidates_k=candidates_k,
+                                _fallback_retriever=_fallback_retriever)
 
     if not reranked_candidates:
         return retrieved_ids, [], [], {}
@@ -144,6 +179,18 @@ def main():
     print("\nInitializing pipeline and loading LTR model...")
     pipeline  = CineVaultPipeline(load_dense=True, db_path=EVAL_DB_PATH, lazy_load_models=False)
     ltr_model = load_ltr_model(LTR_MODEL_PATH)
+
+    # Fix 3: load fallback dense retriever if the index exists
+    fallback_retriever = None
+    if FALLBACK_INDEX_PATH.exists():
+        try:
+            fallback_retriever = FallbackDenseRetriever()
+            print(f"  Fallback dense index loaded.")
+        except Exception as e:
+            print(f"  [warn] Fallback dense retriever failed to load: {e}")
+    else:
+        print(f"  [info] No fallback dense index found at {FALLBACK_INDEX_PATH}.")
+        print(f"         Run: .venv/bin/python scripts/build_fallback_index.py")
     embedding_fn = load_embedding_from_db(db_path=EVAL_DB_PATH, column="v_genome")
 
     baseline_table = []
@@ -164,7 +211,8 @@ def main():
 
         for condition_label, query in QUERIES[user_id]:
             retrieved_ids, b_results, ltr_results, rerank_score_by_id = run_both_scorers(
-                pipeline, profile, query, ltr_model, top_k=10, candidates_k=250
+                pipeline, profile, query, ltr_model, top_k=10, candidates_k=500,
+                _fallback_retriever=fallback_retriever,
             )
 
             b_metrics = evaluate_user(
