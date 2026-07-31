@@ -1,0 +1,263 @@
+{
+  "_comment": "Semantic concept expansion mappings for the QUL engine. Add new entries freely without code changes.",
+  "dark magic": [
+    "demons",
+    "supernatural",
+    "occult",
+    "dark fantasy",
+    "magic",
+    "exorcism",
+    "hell",
+    "witchcraft",
+    "ritual"
+  ],
+  "magic": [
+    "supernatural",
+    "fantasy",
+    "wizards",
+    "sorcery",
+    "magic",
+    "enchantment",
+    "spells"
+  ],
+  "comic book": [
+    "comic",
+    "graphic novel",
+    "superhero",
+    "dc comics",
+    "vertigo",
+    "marvel comics"
+  ],
+  "comic": [
+    "comic",
+    "graphic novel",
+    "superhero"
+  ],
+  "dc": [
+    "dc comics",
+    "superhero",
+    "constantine",
+    "batman",
+    "superman",
+    "wonder woman",
+    "justice league"
+  ],
+  "marvel": [
+    "marvel comics",
+    "superhero",
+    "avengers",
+    "iron man",
+    "spider-man"
+  ],
+  "spy": [
+    "espionage",
+    "secret agent",
+    "cia",
+    "mi6",
+    "covert operations",
+    "double agent",
+    "surveillance"
+  ],
+  "heist": [
+    "robbery",
+    "caper",
+    "con artist",
+    "theft",
+    "bank robbery",
+    "crime",
+    "elaborate scheme"
+  ],
+  "road trip": [
+    "cross country",
+    "journey",
+    "travel",
+    "adventure",
+    "coming of age",
+    "self discovery"
+  ],
+  "dystopia": [
+    "dystopian",
+    "post-apocalyptic",
+    "totalitarian",
+    "oppressive regime",
+    "surveillance state",
+    "authoritarian"
+  ],
+  "zombie": [
+    "undead",
+    "outbreak",
+    "apocalypse",
+    "survival horror",
+    "infection",
+    "plague"
+  ],
+  "vampire": [
+    "undead",
+    "gothic horror",
+    "blood",
+    "immortal",
+    "supernatural",
+    "night creature"
+  ],
+  "serial killer": [
+    "murder mystery",
+    "detective",
+    "crime thriller",
+    "psychopath",
+    "profiler",
+    "investigation"
+  ],
+  "artificial intelligence": [
+    "ai",
+    "robot",
+    "machine learning",
+    "android",
+    "singularity",
+    "automation",
+    "sci-fi"
+  ],
+  "time travel": [
+    "temporal paradox",
+    "time loop",
+    "alternate timeline",
+    "future",
+    "past",
+    "sci-fi"
+  ],
+  "western": [
+    "cowboy",
+    "frontier",
+    "old west",
+    "gunslinger",
+    "outlaw",
+    "sheriff",
+    "saloon"
+  ],
+  "anime": [
+    "japanese animation",
+    "manga",
+    "anime style",
+    "studio ghibli"
+  ],
+  "noir": [
+    "film noir",
+    "neo-noir",
+    "detective",
+    "hard boiled",
+    "femme fatale",
+    "dark atmosphere",
+    "cynical"
+  ],
+  "coming of age": [
+    "bildungsroman",
+    "teenage",
+    "adolescence",
+    "growing up",
+    "youth",
+    "self discovery"
+  ],
+  "war": [
+    "battle",
+    "military",
+    "soldier",
+    "combat",
+    "wwii",
+    "vietnam",
+    "conflict",
+    "battlefield"
+  ],
+  "korean thriller": [
+    "south korea",
+    "revenge",
+    "visceral tension",
+    "dark thriller",
+    "crime mystery",
+    "psychological thriller",
+    "moral ambiguity",
+    "gritty",
+    "twisty plot"
+  ],
+  "french new wave": [
+    "nouvelle vague",
+    "existential",
+    "avant-garde",
+    "jump cuts",
+    "philosophical drama",
+    "french cinema",
+    "character study"
+  ],
+  "japanese horror": [
+    "j-horror",
+    "creepy atmosphere",
+    "dread",
+    "supernatural horror",
+    "curse",
+    "psychological horror",
+    "ghost"
+  ],
+  "nordic noir": [
+    "scandinavian crime",
+    "bleak",
+    "cold atmosphere",
+    "procedural",
+    "grim",
+    "detective",
+    "snow"
+  ],
+  "gothic horror": [
+    "macabre",
+    "haunted house",
+    "eerie atmosphere",
+    "period horror",
+    "melodrama",
+    "dark romance"
+  ],
+  "spooky": [
+    "scary",
+    "creepy",
+    "haunted house",
+    "ghosts",
+    "supernatural",
+    "horror",
+    "atmospheric"
+  ],
+  "chilling": [
+    "creepy",
+    "dread",
+    "psychological horror",
+    "atmospheric",
+    "suspenseful",
+    "terrifying"
+  ],
+  "chiling": [
+    "creepy",
+    "dread",
+    "psychological horror",
+    "atmospheric",
+    "suspenseful",
+    "terrifying"
+  ],
+  "scary": [
+    "horror",
+    "creepy",
+    "dread",
+    "terrifying",
+    "scary",
+    "haunted"
+  ],
+  "classic": [
+    "masterpiece",
+    "acclaimed",
+    "iconic",
+    "essential",
+    "classic"
+  ],
+  "ghost": [
+    "haunted house",
+    "supernatural",
+    "spirits",
+    "paranormal",
+    "horror",
+    "creepy"
+  ]
+}

@@ -1,139 +1,128 @@
-#!/usr/bin/env python3
-"""
-interface/controller.py — Central System Controller & Session Manager for CineVault
-
-Pre-warms and coordinates all underlying engines:
-  • Recommendation Pipeline (nlp/pipeline.py)
-  • User Profile Store (user_profile/store.py)
-  • Local Query Understanding Layer (nlp/qul.py)
-  • Dual-Path LLM Review Extractor (user_profile/review_processor.py)
-
-Acts as the single point of entry for the Terminal User Interface (TUI).
-"""
+"""interface/controller.py — Session controller for CineVault."""
 
 import asyncio
 import logging
 import os
+import re
 import sqlite3
-import sys
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Add project root to sys.path
-PROJECT_ROOT = Path(__file__).parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 from nlp.pipeline import CineVaultPipeline
 from user_profile.review_processor import LLMReviewProcessor
-from user_profile.store import UserProfileStore
+from user_profile.store import ProfileConflictError, UserProfileStore
 from user_profile.schema import UserProfile
 
 logger = logging.getLogger("cinevault.controller")
 
 
 class CineVaultController:
-    """
-    Central Orchestrator & Session Manager for CineVault.
-    """
 
-    def __init__(self, user_id: str = "default_user", auto_prewarm: bool = True):
+    def __init__(self, user_id="default_user", auto_prewarm=True):
         t0 = time.time()
-        logger.info(f"Initializing CineVault Controller for user_id='{user_id}'...")
         self.user_id = user_id
-        
-        # 1. Profile Store & Active User Session State
+
         self.store = UserProfileStore()
         self.profile: UserProfile = self.store.load_profile(self.user_id)
 
-        # 2. Interactive Session Preferences
-        self.lambda_personalization: float = 0.5   # 0.0 pure profile <-> 1.0 pure query
-        self.exclude_watched: bool = True           # Watch history filter toggle
+        self.lambda_personalization = 0.7
+        self.exclude_watched = True
         self.active_search_results: List[Dict[str, Any]] = []
-        self.active_inspected_movie: Optional[Dict[str, Any]] = None
-        self._query_cache: Dict[str, List[Dict[str, Any]]] = {}
+        self.active_inspected_movie = None
+        self._query_cache: dict = {}
 
-        # 3. Pre-warmed Subsystems
         self.pipeline: Optional[CineVaultPipeline] = None
         self.review_processor: Optional[LLMReviewProcessor] = None
+
+        if not self.store.user_exists(self.user_id):
+            self.store.save_profile(self.profile)
 
         if auto_prewarm:
             self.prewarm_engines()
 
-        t1 = time.time()
-        logger.info(f"CineVault Controller initialized in {t1 - t0:.2f}s.")
+        logger.info(f"Controller ready for {user_id!r} in {time.time() - t0:.2f}s.")
 
     def prewarm_engines(self):
-        """Pre-loads heavy recommendation pipelines and models into memory."""
-        logger.info("Pre-warming CineVault Recommendation Engine & Subsystems...")
         self.pipeline = CineVaultPipeline()
         self.review_processor = LLMReviewProcessor(
-            tag_vocabulary=self.pipeline.retriever.tag_vocab if hasattr(self.pipeline.retriever, "tag_vocab") else None
+            tag_vocabulary=list(self.pipeline.retriever.tag_to_idx.keys()) if hasattr(self.pipeline.retriever, "tag_to_idx") else None
         )
-        logger.info("CineVault Subsystems successfully pre-warmed.")
 
-    def search(self, query_str: str, top_k: int = 10) -> List[Dict[str, Any]]:
-        """
-        Executes a personalized query search with caching and returns top_k results.
-        """
+    def _save_profile_safe(self, *, snapshot=False):
+        """Save with optimistic-concurrency conflict handling."""
+        try:
+            self.store.save_profile(self.profile, snapshot=snapshot)
+        except ProfileConflictError:
+            logger.warning(f"Profile conflict for {self.user_id!r} — reloading.")
+            try:
+                fresh = self.store.load_profile(self.user_id)
+                for attr in (
+                    "genre_affinity", "tag_affinity", "tone_affinity",
+                    "pacing_affinity", "actor_affinity", "director_affinity",
+                    "era_affinity", "language_affinity", "country_affinity",
+                    "content_rating_affinity", "genre_confidence",
+                    "director_confidence", "actor_confidence",
+                ):
+                    merged = {**getattr(fresh, attr), **getattr(self.profile, attr)}
+                    setattr(fresh, attr, merged)
+                for attr in ("watch_history", "highly_rated", "poorly_rated",
+                             "watchlist", "abandoned", "rewatched"):
+                    setattr(fresh, attr,
+                            getattr(fresh, attr) | getattr(self.profile, attr))
+                existing_ids = {e["movie_id"] for e in fresh.rating_log}
+                for entry in self.profile.rating_log:
+                    if entry["movie_id"] not in existing_ids:
+                        fresh.rating_log.append(entry)
+                fresh.query_history = (
+                    fresh.query_history + self.profile.query_history
+                )[-50:]
+                self.profile = fresh
+                self.store.save_profile(self.profile, snapshot=snapshot)
+            except ProfileConflictError:
+                logger.warning(f"Conflict retry also failed for {self.user_id!r}. Changes lost.")
+
+    def search(self, query_str, top_k=10):
         if not self.pipeline:
             self.prewarm_engines()
 
         cache_key = f"{self.user_id}:{query_str.strip().lower()}:{top_k}:{self.lambda_personalization}:{self.exclude_watched}"
         if cache_key in self._query_cache:
-            logger.info(f"Query cache hit for key='{cache_key}'")
-            results = self._query_cache[cache_key]
-            self.active_search_results = results
-            return results
+            self.active_search_results = self._query_cache[cache_key]
+            return self._query_cache[cache_key]
 
-        logger.info(f"Controller executing search query: '{query_str}' (λ={self.lambda_personalization:.2f}, exclude_watched={self.exclude_watched})")
-        raw_res = self.pipeline.recommend(
+        raw = self.pipeline.recommend(
             query=query_str,
             user_id=self.user_id,
             top_k=top_k,
             personalization_lambda=self.lambda_personalization,
             include_watched=not self.exclude_watched
         )
-        if isinstance(raw_res, dict):
-            results = raw_res.get("results", raw_res.get("recommendations", []))
-        else:
-            results = raw_res
+        results = raw.get("results", raw.get("recommendations", []))
 
         self._query_cache[cache_key] = results
         self.active_search_results = results
+
+        top_id = results[0].get("movie_id") if results else None
+        self.profile.record_query(query_str, result_count=len(results), top_result_id=top_id)
+        self._save_profile_safe()
+
         return results
 
-    def inspect_movie(self, movie_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Retrieves full hydrated metadata card for the specified movie ID.
-        """
-        # First check active cached search results
+    def inspect_movie(self, movie_id):
         for item in self.active_search_results:
             if item.get("movie_id") == movie_id:
                 self.active_inspected_movie = item
                 return item
 
-        # Hydrate directly from Hydrator if not in current results
         if self.pipeline and self.pipeline.hydrator:
             hydrated = self.pipeline.hydrator.hydrate([{"movie_id": movie_id}])
             if hydrated:
                 self.active_inspected_movie = hydrated[0]
                 return hydrated[0]
-
         return None
 
-    def submit_review(
-        self,
-        movie_id: int,
-        star_rating: float,
-        review_text: str = "",
-        surgical_aspects: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        """
-        Processes a user movie rating/review through Path A surgical checkboxes,
-        LLM extraction (Primary), and Path B local fallback. Persists profile update to SQLite.
-        """
+    def submit_review(self, movie_id, star_rating, review_text="", surgical_aspects=None):
         if not self.review_processor:
             self.prewarm_engines()
 
@@ -147,164 +136,178 @@ class CineVaultController:
             surgical_aspects=surgical_aspects
         )
 
-        # Save updated user profile to local SQLite
-        self.store.save_profile(self.profile)
-        logger.info(f"Persisted updated UserProfile for user_id='{self.user_id}' after review submission.")
+        self._save_profile_safe(snapshot=True)
 
-        # Extract tags for database integration
         extracted_tags = list(result.get("extracted_fuzzy_tags", []))
         if "llm_output" in result and isinstance(result["llm_output"], dict):
             extracted_tags.extend(result["llm_output"].get("extracted_tags", []))
         if surgical_aspects:
             extracted_tags.extend(surgical_aspects)
 
-        # Integrate review into db/cinevault.db catalog tables
         self._integrate_review_into_db(
             movie_id=movie_id,
             star_rating=star_rating,
             review_text=review_text,
             extracted_tags=list(set(extracted_tags))
         )
-
         return result
 
-    def _integrate_review_into_db(
-        self,
-        movie_id: int,
-        star_rating: float,
-        review_text: str,
-        extracted_tags: List[str]
-    ):
-        """
-        Integrates submitted rating, review text, and extracted tags into db/cinevault.db
-        tables (ratings, reviews, user_tags) for continuous catalog learning.
-        """
+    def _integrate_review_into_db(self, movie_id, star_rating, review_text, extracted_tags):
         try:
             conn = sqlite3.connect(self.store.db_path)
             c = conn.cursor()
             now_ts = int(time.time())
 
-            try:
-                uid_num = int(self.user_id)
-            except ValueError:
-                uid_num = abs(hash(self.user_id)) % 1000000
-
             c.execute("""
                 INSERT INTO ratings (user_id, movie_id, rating, rated_at)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(user_id, movie_id) DO UPDATE SET
-                    rating = excluded.rating,
+                    rating   = excluded.rating,
                     rated_at = excluded.rated_at
-            """, (uid_num, movie_id, star_rating, now_ts))
+            """, (self.user_id, movie_id, star_rating, now_ts))
 
             if review_text.strip():
                 c.execute("""
-                    INSERT INTO reviews (movie_id, source, domain, review_text, score, review_date)
-                    VALUES (?, 'cinevault_user', 'audience', ?, ?, CURRENT_TIMESTAMP)
-                """, (movie_id, review_text.strip(), star_rating))
+                    INSERT INTO reviews
+                        (movie_id, source, domain, review_text, score, review_date, user_id)
+                    VALUES (?, 'cinevault_user', 'audience', ?, ?, CURRENT_TIMESTAMP, ?)
+                """, (movie_id, review_text.strip(), star_rating, self.user_id))
 
             for tag in extracted_tags:
                 c.execute("""
                     INSERT INTO user_tags (user_id, movie_id, tag, tagged_at)
                     VALUES (?, ?, ?, ?)
-                """, (uid_num, movie_id, tag.lower(), now_ts))
+                """, (self.user_id, movie_id, tag.lower(), now_ts))
 
             conn.commit()
             conn.close()
-            logger.info(f"Integrated review for movie_id={movie_id} into db/cinevault.db catalog tables.")
         except Exception as e:
-            logger.error(f"Failed to integrate review into db/cinevault.db: {e}")
+            logger.error(f"Failed to integrate review into db: {e}")
 
-    def set_lambda(self, val: float):
-        """Sets personalization weight λ (0.0 = pure user profile, 1.0 = pure query)."""
+    def set_lambda(self, val):
         self.lambda_personalization = max(0.0, min(1.0, float(val)))
-        logger.info(f"Personalization λ updated to {self.lambda_personalization:.2f}")
 
-    def set_exclude_watched(self, enabled: bool):
-        """Sets watch history exclusion filter status."""
+    def set_exclude_watched(self, enabled):
         self.exclude_watched = bool(enabled)
-        logger.info(f"Watch history filter updated to exclude_watched={self.exclude_watched}")
 
-    def update_profile_weights(self, weights: Dict[str, float]):
-        """
-        Updates user sensitivity weights (director, actor, genre, tag, pacing).
-        """
-        if "director_weight" in weights:
-            self.profile.director_weight = float(weights["director_weight"])
-        if "actor_weight" in weights:
-            self.profile.actor_weight = float(weights["actor_weight"])
-        if "genre_weight" in weights:
-            self.profile.genre_weight = float(weights["genre_weight"])
-        if "tag_weight" in weights:
-            self.profile.tag_weight = float(weights["tag_weight"])
-        if "pacing_weight" in weights:
-            self.profile.pacing_weight = float(weights["pacing_weight"])
+    def update_profile_weights(self, weights):
+        for key in ("director_weight", "actor_weight", "genre_weight", "tag_weight", "pacing_weight"):
+            if key in weights:
+                setattr(self.profile, key, float(weights[key]))
+        self._save_profile_safe()
 
-        self.store.save_profile(self.profile)
-        logger.info(f"Updated profile sensitivity weights for user_id='{self.user_id}'")
-
-    async def search_async(self, query_str: str, top_k: int = 10) -> List[Dict[str, Any]]:
-        """
-        Asynchronously executes search on a background worker thread to prevent freezing Textual UI.
-        """
+    async def search_async(self, query_str, top_k=10):
         return await asyncio.to_thread(self.search, query_str, top_k)
 
-    def seed_cold_start(
-        self,
-        favorite_genres: List[str],
-        anchor_movie_ids: List[int],
-        dealbreakers: Optional[List[str]] = None
-    ) -> UserProfile:
-        """
-        Executes 30-Second Cold-Start Onboarding seeding:
-          1. Boosts favorite_genres affinities.
-          2. Extracts metadata & genome tags from anchor_movie_ids to seed taste centroids.
-          3. Applies negative affinities for dealbreaker tags/genres.
-        """
-        logger.info(f"Seeding cold-start profile for user_id='{self.user_id}'...")
-        
-        # 1. Favorite Genres
+    def seed_cold_start(self, favorite_genres, anchor_movie_ids, dealbreakers=None,
+                        preferred_eras=None, preferred_languages=None, runtime_preference="any"):
         for g in favorite_genres:
             g_clean = g.strip()
             self.profile.genre_affinity[g_clean] = self.profile.genre_affinity.get(g_clean, 0.0) + 0.8
+            self.profile.genre_confidence[g_clean] = self.profile.genre_confidence.get(g_clean, 0) + 3
 
-        # 2. Anchor Movies Metadata Extraction
         if anchor_movie_ids:
             if not self.pipeline:
                 self.prewarm_engines()
-            
             cards = self.pipeline.hydrator.hydrate([{"movie_id": mid} for mid in anchor_movie_ids])
             for card in cards:
                 self.profile.apply_rating_update(card, star_rating=5.0, review_confidence=1.0)
 
-        # 3. Dealbreaker Rules
-        if dealbreakers:
-            for db in dealbreakers:
-                db_clean = db.strip().lower()
-                if "no " in db_clean:
-                    db_clean = db_clean.replace("no ", "")
-                self.profile.tag_affinity[db_clean] = -1.0
-                self.profile.genre_affinity[db_clean.capitalize()] = -1.0
+                anchor_tags = []
+                for t in (card.get("top_tags") or [])[:5]:
+                    tag_str = t if isinstance(t, str) else (t.get("tag", "") if isinstance(t, dict) else "")
+                    if tag_str.strip():
+                        anchor_tags.append(tag_str.strip())
+                self._integrate_review_into_db(
+                    movie_id=int(card["movie_id"]),
+                    star_rating=5.0,
+                    review_text="",
+                    extracted_tags=anchor_tags,
+                )
 
-        self.store.save_profile(self.profile)
-        logger.info(f"Cold-start onboarding complete for user_id='{self.user_id}'. Profile saved.")
+        if dealbreakers:
+            self.profile.dealbreakers = list(set(self.profile.dealbreakers + [
+                re.sub(r"^no\s+", "", d.strip().lower()) for d in dealbreakers if d.strip()
+            ]))
+
+        if preferred_eras:
+            for era in preferred_eras:
+                era_clean = era.strip()
+                self.profile.era_affinity[era_clean] = self.profile.era_affinity.get(era_clean, 0.0) + 0.8
+
+        if preferred_languages:
+            for lang in preferred_languages:
+                lc = lang.strip().lower()
+                self.profile.language_affinity[lc] = self.profile.language_affinity.get(lc, 0.0) + 0.8
+
+        if runtime_preference in ("short", "standard", "epic", "any"):
+            self.profile.runtime_preference = runtime_preference
+
+        self._save_profile_safe()
         return self.profile
 
-    def list_users(self) -> List[str]:
-        """Returns list of all registered user IDs in local SQLite database."""
+    # TUI calls these — they handle save-after-mutate
+
+    def add_to_watchlist(self, movie_id):
+        self.profile.add_to_watchlist(movie_id)
+        self._save_profile_safe()
+
+    def mark_abandoned(self, movie_id):
+        self.profile.mark_abandoned(movie_id)
+        self._save_profile_safe()
+
+    def log_correction(self, movie_id, title, reason):
+        self.profile.log_correction(movie_id, title, reason)
+        self._save_profile_safe()
+
+    def clear_query_history(self):
+        self.profile.clear_query_history()
+        self._save_profile_safe()
+
+    def set_signal_enabled(self, signal_name, enabled):
+        if not enabled:
+            if signal_name not in self.profile.disabled_signals:
+                self.profile.disabled_signals.append(signal_name)
+        else:
+            if signal_name in self.profile.disabled_signals:
+                self.profile.disabled_signals.remove(signal_name)
+        self._save_profile_safe()
+
+    def get_signal_weights(self):
+        return dict(self.profile.signal_weights)
+
+    def set_signal_weight(self, signal_name, level):
+        if level not in ("off", "light", "balanced", "strong"):
+            return
+        self.profile.signal_weights[signal_name] = level
+        self._save_profile_safe()
+
+    def get_memory_entries(self):
+        return list(self.profile.memory_entries)
+
+    def add_memory_entry(self, entry):
+        if entry.strip() and entry.strip() not in self.profile.memory_entries:
+            self.profile.memory_entries.append(entry.strip())
+            self._save_profile_safe()
+
+    def delete_memory_entry(self, index):
+        if 0 <= index < len(self.profile.memory_entries):
+            self.profile.memory_entries.pop(index)
+            self._save_profile_safe()
+
+    def clear_all_memory(self):
+        self.profile.memory_entries.clear()
+        self._save_profile_safe()
+
+    def list_users(self):
         return self.store.list_users()
 
-    def switch_user(self, user_id: str) -> UserProfile:
-        """Switches current active session user profile."""
+    def switch_user(self, user_id):
         self.user_id = user_id
         self.profile = self.store.load_profile(user_id)
-        logger.info(f"Switched active session to user_id='{self.user_id}'")
         return self.profile
 
-    def format_inspector_markdown(self, card: Dict[str, Any]) -> str:
-        """
-        Formats a hydrated movie card into rich Markdown for the TUI IMDb Inspector Modal.
-        """
+    def format_inspector_markdown(self, card):
         title = card.get("title", "Unknown Title")
         year = card.get("year", "N/A")
         rating_str = f"★ {card.get('avg_rating', 0.0):.2f}" if card.get("avg_rating") else "★ Unrated"
@@ -313,7 +316,7 @@ class CineVaultController:
         directors = ", ".join(card.get("directors", [])) or "N/A"
         cast = ", ".join(card.get("actors", card.get("cast", []))[:6]) or "N/A"
 
-        md_lines = [
+        md = [
             f"# {title} ({year})",
             f"**Rating**: {rating_str} {count_str} | **Tier**: `{card.get('tier', 'Tier C')}`",
             f"**Genres**: {genres}",
@@ -323,36 +326,14 @@ class CineVaultController:
         ]
 
         if card.get("overview"):
-            md_lines.append(f"### Plot Overview\n{card['overview']}\n")
+            md.append(f"### Plot Overview\n{card['overview']}\n")
         if card.get("themes"):
-            md_lines.append(f"**Themes**: {', '.join(card['themes'])}")
+            md.append(f"**Themes**: {', '.join(card['themes'])}")
         if card.get("tone"):
-            md_lines.append(f"**Tone**: {', '.join(card['tone'])}")
+            md.append(f"**Tone**: {', '.join(card['tone'])}")
         if card.get("pacing"):
-            md_lines.append(f"**Pacing**: {card['pacing']}")
+            md.append(f"**Pacing**: {card['pacing']}")
         if card.get("comparable_films"):
-            md_lines.append(f"**Similar Titles**: {', '.join(card['comparable_films'][:5])}")
+            md.append(f"**Similar Titles**: {', '.join(card['comparable_films'][:5])}")
 
-        return "\n".join(md_lines)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    ctrl = CineVaultController(user_id="controller_test_user")
-
-    print("\n--- Testing Search via Controller ---")
-    results = ctrl.search("atmospheric slow burn murder mystery", top_k=3)
-    for r in results:
-        print(f"  #{r.get('final_rank')} {r.get('title')} ({r.get('year')}) — Rating: {r.get('avg_rating')}")
-
-    if results:
-        top_movie_id = results[0]["movie_id"]
-        print(f"\n--- Testing Review Submission via Controller for Movie ID {top_movie_id} ---")
-        review_res = ctrl.submit_review(
-            movie_id=top_movie_id,
-            star_rating=5.0,
-            review_text="Absolute masterpiece with incredible visual storytelling and slow burn tension.",
-            surgical_aspects=["Visuals", "Plot", "Pacing"]
-        )
-        print("Review Submission Outcome:", json.dumps(review_res, indent=2))
-        print("Updated User Profile Tag Affinities:", ctrl.profile.tag_affinity)
+        return "\n".join(md)

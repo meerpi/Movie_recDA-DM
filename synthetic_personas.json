@@ -1,0 +1,813 @@
+{
+    "ratings_insert": [
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1196,
+            "rating": 5.0,
+            "rated_at": 1736637317,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1210,
+            "rating": 4.5,
+            "rated_at": 1737585172,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1270,
+            "rating": 4.5,
+            "rated_at": 1738533027,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1240,
+            "rating": 4.5,
+            "rated_at": 1739480882,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 541,
+            "rating": 5.0,
+            "rated_at": 1740428738,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1097,
+            "rating": 4.0,
+            "rated_at": 1741376593,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 2716,
+            "rating": 4.0,
+            "rated_at": 1742324448,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1200,
+            "rating": 5.0,
+            "rated_at": 1743272303,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 2011,
+            "rating": 3.5,
+            "rated_at": 1744220158,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1127,
+            "rating": 4.0,
+            "rated_at": 1745168013,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 3527,
+            "rating": 4.0,
+            "rated_at": 1746115869,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1374,
+            "rating": 4.0,
+            "rated_at": 1747063724,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 1199,
+            "rating": 4.5,
+            "rated_at": 1748011579,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 2985,
+            "rating": 4.0,
+            "rated_at": 1748959434,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 2288,
+            "rating": 4.5,
+            "rated_at": 1749907289,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 2455,
+            "rating": 4.0,
+            "rated_at": 1750855144,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 79132,
+            "rating": 5.0,
+            "rated_at": 1751803000,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 109487,
+            "rating": 5.0,
+            "rated_at": 1752750855,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 134130,
+            "rating": 4.5,
+            "rated_at": 1753698710,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 115713,
+            "rating": 4.5,
+            "rated_at": 1754646565,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 122882,
+            "rating": 4.5,
+            "rated_at": 1755594420,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 2571,
+            "rating": 5.0,
+            "rated_at": 1736611389,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1196,
+            "rating": 5.0,
+            "rated_at": 1737666244,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1210,
+            "rating": 4.5,
+            "rated_at": 1738721099,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1270,
+            "rating": 4.5,
+            "rated_at": 1739775954,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1240,
+            "rating": 4.5,
+            "rated_at": 1740830809,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 541,
+            "rating": 5.0,
+            "rated_at": 1741885664,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1200,
+            "rating": 5.0,
+            "rated_at": 1742940519,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 2648,
+            "rating": 1.5,
+            "rated_at": 1743995374,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 79132,
+            "rating": 5.0,
+            "rated_at": 1745050229,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 109487,
+            "rating": 5.0,
+            "rated_at": 1746105084,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 134130,
+            "rating": 4.5,
+            "rated_at": 1747159939,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 1340,
+            "rating": 1.0,
+            "rated_at": 1748214794,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 115713,
+            "rating": 4.5,
+            "rated_at": 1749269649,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 122882,
+            "rating": 4.5,
+            "rated_at": 1750324504,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 3527,
+            "rating": 4.0,
+            "rated_at": 1751379359,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 2288,
+            "rating": 4.5,
+            "rated_at": 1752434214,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 2010,
+            "rating": 1.5,
+            "rated_at": 1753489069,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 89745,
+            "rating": 4.5,
+            "rated_at": 1754543924,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 593,
+            "rating": 5.0,
+            "rated_at": 1737877546,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 2762,
+            "rating": 4.5,
+            "rated_at": 1740065529,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 1219,
+            "rating": 5.0,
+            "rated_at": 1742253512,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 1258,
+            "rating": 5.0,
+            "rated_at": 1744441495,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 1387,
+            "rating": 4.5,
+            "rated_at": 1746629478,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 8874,
+            "rating": 4.5,
+            "rated_at": 1748817461,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 253,
+            "rating": 4.0,
+            "rated_at": 1751005444,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 2710,
+            "rating": 4.0,
+            "rated_at": 1753193427,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 5965,
+            "rating": 4.5,
+            "rated_at": 1736466782,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 2956,
+            "rating": 4.0,
+            "rated_at": 1737241637,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 4572,
+            "rating": 4.0,
+            "rated_at": 1738016492,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 3418,
+            "rating": 5.0,
+            "rated_at": 1738791347,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 8905,
+            "rating": 4.0,
+            "rated_at": 1739566202,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 3578,
+            "rating": 5.0,
+            "rated_at": 1740341057,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 5010,
+            "rating": 4.5,
+            "rated_at": 1741115912,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 6708,
+            "rating": 4.0,
+            "rated_at": 1741890767,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 33162,
+            "rating": 4.5,
+            "rated_at": 1742665622,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 49130,
+            "rating": 4.0,
+            "rated_at": 1743440477,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 55765,
+            "rating": 4.5,
+            "rated_at": 1744215332,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 62374,
+            "rating": 4.0,
+            "rated_at": 1744990187,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 77866,
+            "rating": 4.0,
+            "rated_at": 1745765042,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 105755,
+            "rating": 4.0,
+            "rated_at": 1746539897,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 116887,
+            "rating": 4.0,
+            "rated_at": 1747314752,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 182825,
+            "rating": 4.0,
+            "rated_at": 1748089607,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 1214,
+            "rating": 5.0,
+            "rated_at": 1748864462,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 541,
+            "rating": 5.0,
+            "rated_at": 1749639317,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 2143,
+            "rating": 4.5,
+            "rated_at": 1750414172,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 94864,
+            "rating": 4.0,
+            "rated_at": 1751189027,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 134130,
+            "rating": 4.5,
+            "rated_at": 1751963882,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 199596,
+            "rating": 4.0,
+            "rated_at": 1736618428,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 200286,
+            "rating": 5.0,
+            "rated_at": 1737388311,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 200510,
+            "rating": 4.0,
+            "rated_at": 1738158193,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 201642,
+            "rating": 4.0,
+            "rated_at": 1738928076,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202037,
+            "rating": 5.0,
+            "rated_at": 1739697958,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202275,
+            "rating": 4.0,
+            "rated_at": 1740467841,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202287,
+            "rating": 4.5,
+            "rated_at": 1741237723,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202441,
+            "rating": 4.5,
+            "rated_at": 1742007606,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202557,
+            "rating": 4.0,
+            "rated_at": 1742777488,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 202577,
+            "rating": 4.0,
+            "rated_at": 1743547371,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203066,
+            "rating": 4.0,
+            "rated_at": 1744317253,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203086,
+            "rating": 5.0,
+            "rated_at": 1745087136,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203338,
+            "rating": 4.0,
+            "rated_at": 1745857018,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203735,
+            "rating": 4.0,
+            "rated_at": 1746626901,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203847,
+            "rating": 4.0,
+            "rated_at": 1747396783,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203855,
+            "rating": 4.0,
+            "rated_at": 1748166666,
+            "note": "train"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203962,
+            "rating": 4.5,
+            "rated_at": 1748936548,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 204074,
+            "rating": 4.0,
+            "rated_at": 1749706431,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205122,
+            "rating": 4.0,
+            "rated_at": 1750476313,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205190,
+            "rating": 4.5,
+            "rated_at": 1751246196,
+            "note": "test"
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205395,
+            "rating": 4.0,
+            "rated_at": 1752016078,
+            "note": "test"
+        }
+    ],
+    "user_tags_insert": [
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 356,
+            "tag": "atmospheric",
+            "tagged_at": 1737119046
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 318,
+            "tag": "atmospheric",
+            "tagged_at": 1738548492
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 296,
+            "tag": "atmospheric",
+            "tagged_at": 1739977938
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 593,
+            "tag": "atmospheric",
+            "tagged_at": 1741407384
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 2571,
+            "tag": "atmospheric",
+            "tagged_at": 1742836830
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 260,
+            "tag": "atmospheric",
+            "tagged_at": 1744266276
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 480,
+            "tag": "atmospheric",
+            "tagged_at": 1745695722
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 527,
+            "tag": "atmospheric",
+            "tagged_at": 1747125168
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 110,
+            "tag": "atmospheric",
+            "tagged_at": 1748554614
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 2959,
+            "tag": "atmospheric",
+            "tagged_at": 1749984060
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 589,
+            "tag": "atmospheric",
+            "tagged_at": 1751413506
+        },
+        {
+            "user_id": "synth_tag_only",
+            "movie_id": 1,
+            "tag": "atmospheric",
+            "tagged_at": 1752842952
+        }
+    ],
+    "test_rationale": [
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 79132,
+            "why_nontrivial": "While tagged Science Fiction, Inception is a 2010s psychological heist thriller operating in a completely different era and narrative style than the 1980s space-opera/cyberpunk training set."
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 109487,
+            "why_nontrivial": "Interstellar is a 2010s deep-space gravitational relativity drama, presenting a modern cerebral narrative distinct from the 1980s action/adventure Sci-Fi cluster in training."
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 134130,
+            "why_nontrivial": "The Martian is a 2015 realistic survival hard-sci-fi film, contrasting sharply with the synth-wave 1980s monster/dystopian Sci-Fi subgenres in the training history."
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 115713,
+            "why_nontrivial": "Ex Machina is a 2015 minimalist AI chamber drama, testing whether the recommender can bridge modern psychological sci-fi from 1980s futuristic action movies."
+        },
+        {
+            "user_id": "synth_scifi_fan",
+            "movie_id": 122882,
+            "why_nontrivial": "Mad Max: Fury Road is a 2015 post-apocalyptic diesel-punk thriller, representing a modern subgenre transformation that standard 1980s Sci-Fi tag matching would fail to align."
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 2010,
+            "why_nontrivial": "Metropolis (1927) is a 1920s silent sci-fi film; evaluating a LOW rating (1.5) tests whether the profile captures the specific negative era preference (dislikes 1920s/period-piece sci-fi) rather than blindly assigning high additive Sci-Fi affinity."
+        },
+        {
+            "user_id": "synth_contradictory",
+            "movie_id": 89745,
+            "why_nontrivial": "The Avengers (2012) is a modern action Sci-Fi blockbuster; evaluating a HIGH rating (4.5) confirms that general modern Sci-Fi preference remains strong despite negative era penalties."
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 1258,
+            "why_nontrivial": "Held-out test item 1 for cold-start profile; testing retrieval performance under near-zero training interaction count."
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 1387,
+            "why_nontrivial": "Held-out test item 2 for cold-start profile; testing retrieval performance under near-zero training interaction count."
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 8874,
+            "why_nontrivial": "Held-out test item 3 for cold-start profile; testing retrieval performance under near-zero training interaction count."
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 253,
+            "why_nontrivial": "Held-out test item 4 for cold-start profile; testing retrieval performance under near-zero training interaction count."
+        },
+        {
+            "user_id": "synth_cold_start",
+            "movie_id": 2710,
+            "why_nontrivial": "Held-out test item 5 for cold-start profile; testing retrieval performance under near-zero training interaction count."
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 1214,
+            "why_nontrivial": "Alien (1979) is a Sci-Fi/Horror film by Ridley Scott; naive genre matching fails because training contains zero Sci-Fi or Horror entries, but director-affinity retrieval successfully captures it."
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 541,
+            "why_nontrivial": "Blade Runner (1982) is a Sci-Fi/Cyberpunk landmark by Ridley Scott; pure genre filtering would miss it since training is restricted to historical dramas, war epics, and crime thrillers."
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 2143,
+            "why_nontrivial": "Legend (1985) is a Fantasy/Adventure film by Ridley Scott; genre retrieval would miss it due to lack of Fantasy training items, whereas director affinity bridges the connection."
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 94864,
+            "why_nontrivial": "Prometheus (2012) is a modern Sci-Fi/Horror entry by Ridley Scott; genre-only matching misses it entirely due to disjoint genre spaces between training and test sets."
+        },
+        {
+            "user_id": "synth_director_driven",
+            "movie_id": 134130,
+            "why_nontrivial": "The Martian (2015) is a Sci-Fi survival drama by Ridley Scott; direct genre overlap with training is absent, proving that recommendations are driven by director affinity."
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 203962,
+            "why_nontrivial": "Go Back to China (2019) has minimal rating volume (num_ratings <= 3); tests whether the engine promotes obscure/indie items by bypassing standard popularity rating gates."
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 204074,
+            "why_nontrivial": "Innocent Witness (2019) is a low-volume indie drama; tests obscure candidate generation without popularity bias."
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205122,
+            "why_nontrivial": "Geek, and You Shall Find (2019) is a niche documentary with minimal ratings; tests obscure intent retrieval."
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205190,
+            "why_nontrivial": "Mike Wallace Is Here (2019) is an indie documentary in the bottom rating volume quartile; verifies long-tail candidate scoring."
+        },
+        {
+            "user_id": "synth_obscure_indie",
+            "movie_id": 205395,
+            "why_nontrivial": "Raatchasi (2019) is a low-volume foreign indie film; tests long-tail discovery for obscure-only profiles."
+        }
+    ]
+}

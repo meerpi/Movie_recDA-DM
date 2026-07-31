@@ -26,6 +26,10 @@ dirtywork/
 *.hnsw
 *.pkl
 *.npy
+*.gguf
+*.bin
+*.pt
+*.safetensors
 
 # Large data dumps
 *.jsonl

@@ -2,12 +2,15 @@
 interface/tui/modals/onboarding.py — Cold-Start Onboarding Wizard Modal Screen
 """
 
+from pathlib import Path
 from typing import List
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Button, Checkbox, Input, Label, Static
+from textual.widgets import Button, Checkbox, Input, Label, Rule, Static
+from user_profile.identity import resolve_anchor_tokens
 
+_PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 class ColdStartOnboardingModal(ModalScreen[None]):
     """
@@ -21,30 +24,29 @@ class ColdStartOnboardingModal(ModalScreen[None]):
     GENRES = ["Action", "Comedy", "Drama", "Horror", "Mystery", "Sci-Fi", "Thriller", "Western"]
 
     def compose(self) -> ComposeResult:
-        genre_checkboxes = [Checkbox(g, value=(g in ["Sci-Fi", "Thriller"]), id=f"genre-{g.lower()}") for g in self.GENRES]
+        genre_checkboxes = [Checkbox(g, value=False, id=f"genre-{g.lower()}") for g in self.GENRES]
 
         container = Vertical(
+            Static("[ ONBOARDING ]", id="onboard-title"),
             VerticalScroll(
-                Label("1. Select Your Favorite Genres:"),
+                Label("[ STEP 1 ]  Select favorite genres:"),
                 Horizontal(*genre_checkboxes[:4], id="onboard-genres-1"),
                 Horizontal(*genre_checkboxes[4:], id="onboard-genres-2"),
-                Static("─" * 40),
-                Label("2. Enter 2-3 Anchor Movie IDs (e.g., 58559, 79132, 1214):"),
+                Rule(),
+                Label("[ STEP 2 ]  Enter 2-3 anchor movie IDs or titles:"),
                 Input(value="58559, 79132", id="input-anchors"),
-                Static("─" * 40),
-                Label("3. Enter Dealbreaker Rules (e.g. 'No Slapstick', 'No Gore'):"),
+                Rule(),
+                Label("[ STEP 3 ]  Dealbreaker rules (e.g. 'No Slapstick', 'No Gore'):"),
                 Input(value="No Slapstick", id="input-dealbreakers"),
                 id="onboard-scroll-body"
             ),
             Horizontal(
-                Button("SAVE PROFILE", id="btn-save-onboard", variant="success"),
-                Button("CANCEL [ESC]", id="btn-cancel-onboard", variant="error"),
+                Button("[ SAVE PROFILE ]", id="btn-save-onboard", classes="-filled"),
+                Button("[ CANCEL ]", id="btn-cancel-onboard", classes="-ghost"),
                 id="onboard-buttons"
             ),
             id="onboard-container"
         )
-        container.border_title = "▸ ONBOARDING WIZARD"
-        container.border_subtitle = "cold-start profile"
 
         yield Container(
             container,
@@ -65,10 +67,11 @@ class ColdStartOnboardingModal(ModalScreen[None]):
                 fav_genres.append(g)
 
         raw_anchors = self.query_one("#input-anchors", Input).value
-        anchor_ids: List[int] = []
-        for val in raw_anchors.split(","):
-            if val.strip().isdigit():
-                anchor_ids.append(int(val.strip()))
+        db_path = _PROJECT_ROOT / "db" / "cinevault.db"
+
+        anchor_ids, anchor_warnings = resolve_anchor_tokens(raw_anchors, db_path)
+        for msg in anchor_warnings:
+            self.notify(msg, title="Anchor Lookup", severity="warning")
 
         raw_dealbreakers = self.query_one("#input-dealbreakers", Input).value
         dealbreakers = [d.strip() for d in raw_dealbreakers.split(",") if d.strip()]
@@ -80,6 +83,6 @@ class ColdStartOnboardingModal(ModalScreen[None]):
                 anchor_movie_ids=anchor_ids,
                 dealbreakers=dealbreakers
             )
-            self.notify("✓ Cold-start profile preferences saved!", title="Profile Updated")
+            self.notify("Profile preferences saved.", title="Profile Updated")
 
         self.dismiss()

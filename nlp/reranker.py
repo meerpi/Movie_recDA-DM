@@ -1,17 +1,4 @@
-#!/usr/bin/env python3
-"""
-nlp/reranker.py — Step 8: Cross-Encoder Second-Stage Reranker
-
-Supports:
-  1. "BAAI/bge-reranker-v2-m3" (Default: Fast, ~0.7GB VRAM, ~250ms)
-  2. "QuantFactory/Qwen3-Reranker-4B-GGUF" (Pre-quantized 4-bit GGUF: ~0.67 NDCG, ~2.1GB VRAM)
-
-Usage:
-    from nlp.reranker import CineVaultReranker
-
-    reranker = CineVaultReranker(use_qwen_4bit=True)
-    reranked = reranker.rerank(query, candidates, top_k=10)
-"""
+"""nlp/reranker.py — Cross-encoder reranker (BGE default, optional Qwen3 GGUF)."""
 
 import logging
 import os
@@ -30,85 +17,68 @@ from sentence_transformers import CrossEncoder
 
 logger = logging.getLogger("cinevault.reranker")
 
-BAAI_MODEL_NAME = "BAAI/bge-reranker-v2-m3"
-GGUF_MODEL_PATH = Path.home() / ".cache" / "huggingface" / "hub" / "models--QuantFactory--Qwen3-Reranker-4B-GGUF" / "snapshots" / "2a42c7aa9c702165da87b09dec164a54d973123b" / "Qwen3-Reranker-4B.Q4_K_M.gguf"
+BAAI_MODEL   = "BAAI/bge-reranker-v2-m3"
+GGUF_PATH    = (
+    Path.home() / ".cache" / "huggingface" / "hub"
+    / "models--QuantFactory--Qwen3-Reranker-4B-GGUF"
+    / "snapshots" / "2a42c7aa9c702165da87b09dec164a54d973123b"
+    / "Qwen3-Reranker-4B.Q4_K_M.gguf"
+)
 
 
 class CineVaultReranker:
 
-    def __init__(
-        self,
-        model_name: str = BAAI_MODEL_NAME,
-        device: Optional[str] = None,
-        use_qwen_4bit: bool = False
-    ):
-        if device is None:
-            self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        else:
-            self.device = device
-
+    def __init__(self, model_name=BAAI_MODEL, device=None, use_qwen_4bit=False):
+        self.device       = device or ("cuda" if torch.cuda.is_available() else "cpu")
         self.use_qwen_4bit = use_qwen_4bit or ("qwen" in model_name.lower())
 
-        logger.info(f"Initializing CineVaultReranker (Qwen 4-bit={self.use_qwen_4bit}) on {self.device}...")
+        logger.info(f"Loading reranker (Qwen4bit={self.use_qwen_4bit}) on {self.device} ...")
         t0 = time.time()
 
-        if self.use_qwen_4bit and GGUF_MODEL_PATH.exists():
+        if self.use_qwen_4bit and GGUF_PATH.exists():
             from llama_cpp import Llama
             self.model_type = "gguf"
-            self.gguf_llm = Llama(
-                model_path=str(GGUF_MODEL_PATH),
+            self.gguf_llm   = Llama(
+                model_path=str(GGUF_PATH),
                 n_gpu_layers=-1 if self.device == "cuda" else 0,
-                embedding=True,
-                verbose=False
+                logits_all=True,
+                verbose=False,
             )
-            logger.info("Loaded pre-quantized Qwen3-Reranker-4B.Q4_K_M.gguf on GPU")
+            self.yes_id       = self.gguf_llm.tokenize(b"Yes")[-1]
+            self.no_id        = self.gguf_llm.tokenize(b"No")[-1]
+            self.yes_lower_id = self.gguf_llm.tokenize(b"yes")[-1]
+            self.no_lower_id  = self.gguf_llm.tokenize(b"no")[-1]
         else:
             self.model_type = "bge"
-            self.model = CrossEncoder(BAAI_MODEL_NAME, device=self.device, max_length=256)
-            logger.info(f"Loaded {BAAI_MODEL_NAME} cross-encoder on {self.device}")
+            self.model      = CrossEncoder(BAAI_MODEL, device=self.device, max_length=256)
 
-        t1 = time.time()
-        logger.info(f"Reranker model loaded in {t1 - t0:.2f}s")
+        logger.info(f"Reranker ready in {time.time() - t0:.2f}s.")
 
-    def build_passage_text(self, item: Dict[str, Any]) -> str:
-        """Formats candidate result item into a compact passage for high-speed GPU cross-encoding."""
+    def build_passage_text(self, item):
         parts = []
-
         title = item.get("title", "")
-        year = item.get("year", "")
+        year  = item.get("year", "")
         if title:
             parts.append(f"Title: {title} ({year})" if year else f"Title: {title}")
-
-        genres = item.get("genres", [])
-        if genres:
-            parts.append(f"Genres: {', '.join(genres[:3])}" if isinstance(genres, list) else f"Genres: {genres}")
-
-        themes = item.get("themes", [])
-        if themes:
-            parts.append(f"Themes: {', '.join(themes[:3])}" if isinstance(themes, list) else f"Themes: {themes}")
-
-        tags = item.get("top_tags", [])
-        if tags:
-            if isinstance(tags, list):
-                top_few = tags[:8]
-                tag_strs = [t if isinstance(t, str) else t.get("tag", "") for t in top_few]
-                parts.append(f"Tags: {', '.join(filter(None, tag_strs))}")
-
+        if item.get("directors"):
+            dirs = item["directors"]
+            parts.append(f"Director: {', '.join(dirs[:2]) if isinstance(dirs, list) else str(dirs)}")
+        if item.get("actors"):
+            actors = item["actors"]
+            parts.append(f"Starring: {', '.join(actors[:4]) if isinstance(actors, list) else str(actors)}")
+        if item.get("genres"):
+            parts.append(f"Genres: {', '.join(item['genres'][:3])}")
+        if item.get("themes"):
+            parts.append(f"Themes: {', '.join(item['themes'][:3])}")
+        if item.get("top_tags"):
+            tags = [t if isinstance(t, str) else t.get("tag", "") for t in item["top_tags"][:8] if t is not None]
+            parts.append(f"Tags: {', '.join(filter(None, tags))}")
         overview = item.get("overview") or item.get("wiki_intro")
         if overview:
-            clean_ov = overview.replace("\n", " ").strip()
-            parts.append(f"Plot: {clean_ov[:120]}")
-
+            parts.append(f"Plot: {overview.replace(chr(10), ' ').strip()[:120]}")
         return " | ".join(parts) if parts else str(item)
 
-    def rerank(
-        self,
-        query: str,
-        candidates: List[Dict[str, Any]],
-        top_k: int = 10,
-        batch_size: int = 32
-    ) -> List[Dict[str, Any]]:
-        """Reranks candidates using cross-attention with fp16 GPU autocast acceleration."""
+    def rerank(self, query, candidates, top_k=10, batch_size=32):
         if not candidates:
             return []
 
@@ -116,75 +86,37 @@ class CineVaultReranker:
         t0 = time.time()
 
         if self.model_type == "gguf":
-            import numpy as np
-
-            q_raw = np.array(self.gguf_llm.create_embedding(query)["data"][0]["embedding"])
-            q_vec = np.mean(q_raw, axis=0) if q_raw.ndim > 1 else q_raw
-            q_norm = q_vec / (np.linalg.norm(q_vec) + 1e-9)
-
             scores = []
             for p in passages:
-                p_raw = np.array(self.gguf_llm.create_embedding(p)["data"][0]["embedding"])
-                p_vec = np.mean(p_raw, axis=0) if p_raw.ndim > 1 else p_raw
-                p_norm = p_vec / (np.linalg.norm(p_vec) + 1e-9)
-                scores.append(float(np.dot(q_norm, p_norm)))
-
+                prompt = (
+                    f'Given a query "{query}", is the following document relevant?\n'
+                    f'Document: {p}\nAnswer:'
+                )
+                tokens = self.gguf_llm.tokenize(prompt.encode("utf-8"))
+                self.gguf_llm.reset()
+                self.gguf_llm.eval(tokens)
+                logits    = self.gguf_llm._scores[-1]
+                score_yes = max(logits[self.yes_id], logits[self.yes_lower_id])
+                score_no  = max(logits[self.no_id], logits[self.no_lower_id])
+                scores.append(float(score_yes - score_no))
         else:
             pairs = [(query, p) for p in passages]
             with torch.inference_mode():
                 if self.device == "cuda":
-                    with torch.amp.autocast('cuda', dtype=torch.float16):
+                    with torch.amp.autocast("cuda", dtype=torch.float16):
                         scores = self.model.predict(pairs, batch_size=batch_size, show_progress_bar=False)
                 else:
                     scores = self.model.predict(pairs, batch_size=batch_size, show_progress_bar=False)
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
 
-        t1 = time.time()
-
-        scored_candidates = []
+        scored = []
         for orig_idx, (cand, score) in enumerate(zip(candidates, scores)):
-            cand_copy = dict(cand)
-            cand_copy["rerank_score"] = float(score)
-            cand_copy["rrf_rank"] = orig_idx + 1
-            scored_candidates.append(cand_copy)
+            item = dict(cand)
+            item["rerank_score"] = float(score)
+            item["rrf_rank"]     = orig_idx + 1
+            scored.append(item)
 
-        scored_candidates.sort(key=lambda x: x["rerank_score"], reverse=True)
-
-        logger.debug(
-            f"Reranked {len(candidates)} candidates in {t1 - t0:.3f}s. "
-            f"Top score: {scored_candidates[0]['rerank_score']:.4f}"
-        )
-
-        return scored_candidates[:top_k]
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    print("Testing CineVaultReranker (Qwen 4-bit)...")
-    reranker = CineVaultReranker(use_qwen_4bit=True)
-
-    test_query = "movies like Annabelle"
-    test_candidates = [
-        {
-            "movie_id": 1,
-            "title": "Grandma's Boy",
-            "year": 2006,
-            "genres": ["Comedy"],
-            "themes": ["slacker", "video games"],
-            "tone": ["silly"],
-        },
-        {
-            "movie_id": 2,
-            "title": "The Boy",
-            "year": 2016,
-            "genres": ["Horror", "Thriller"],
-            "themes": ["possessed doll", "demonic entity", "supernatural dread"],
-            "tone": ["creepy", "menacing"],
-            "comparable_films": ["Annabelle", "The Conjuring"],
-        },
-    ]
-
-    results = reranker.rerank(test_query, test_candidates)
-    for i, res in enumerate(results, 1):
-        print(f"#{i} {res['title']} ({res['year']}) — Score: {res['rerank_score']:.4f} (Original RRF Rank: #{res['rrf_rank']})")
+        scored.sort(key=lambda x: x["rerank_score"], reverse=True)
+        logger.debug(f"Reranked {len(candidates)} in {time.time() - t0:.3f}s. Top: {scored[0]['rerank_score']:.4f}")
+        return scored[:top_k]

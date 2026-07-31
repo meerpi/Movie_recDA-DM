@@ -1,161 +1,122 @@
-#!/usr/bin/env python3
-"""
-nlp/retriever.py — Step 5: Multi-Lane RRF Search Retriever Engine
-
-Combines 3 search lanes via Reciprocal Rank Fusion (RRF):
-  • Lane 1 (BM25)       : Keyword search over Tier A profile card text
-  • Lane 2 (Genome HNSW): Tag-genome ANN search over Tier A + B movies (13,816)
-  • Lane 3 (Dense HNSW) : Semantic ANN search via Voyage-4-Large over Tier A movies (9,526)
-
-RRF Scoring:
-  score(movie_id) = Σ  1.0 / (60 + rank_i + 1)
-                   lanes
-
-Usage:
-    from nlp.retriever import CineVaultRetriever
-
-    retriever = CineVaultRetriever()
-    results = retriever.search("atmospheric slow burn Korean thriller", top_k=10)
-
-CLI test:
-    .venv/bin/python nlp/retriever.py "atmospheric slow burn Korean thriller"
-"""
+"""nlp/retriever.py — Multi-lane RRF search (BM25 + Genome HNSW + Dense Voyage)."""
 
 import csv
 import json
+import logging
 import math
 import os
 import pickle
 import re
-import sys
 import time
 from collections import defaultdict
 from pathlib import Path
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).parent.parent / ".env")
+except ImportError:
+    pass
+
 import hnswlib
 import numpy as np
 
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
-PROJECT_ROOT     = Path(__file__).parent.parent
-BM25_INDEX_PATH  = PROJECT_ROOT / "nlp" / "bm25_index.pkl"
-BM25_MAP_PATH    = PROJECT_ROOT / "nlp" / "bm25_id_map.json"
-GENOME_HNSW_PATH = PROJECT_ROOT / "nlp" / "genome.hnsw"
-GENOME_MAP_PATH  = PROJECT_ROOT / "nlp" / "genome_id_map.json"
-GENOME_TAGS_PATH = PROJECT_ROOT / "data" / "ml-25m" / "genome-tags.csv"
-DENSE_HNSW_PATH  = PROJECT_ROOT / "nlp" / "dense.hnsw"
-DENSE_MAP_PATH   = PROJECT_ROOT / "nlp" / "dense_id_map.json"
+logger = logging.getLogger("cinevault.retriever")
 
-VOYAGE_MODEL     = "voyage-4-large"
-RRF_K            = 60
-DEFAULT_LANE_K   = 100
+PROJECT_ROOT     = Path(__file__).parent.parent
+BM25_INDEX_PATH  = PROJECT_ROOT / "dirtywork" / "bm25_index.pkl"
+BM25_MAP_PATH    = PROJECT_ROOT / "dirtywork" / "bm25_id_map.json"
+GENOME_HNSW_PATH = PROJECT_ROOT / "dirtywork" / "genome.hnsw"
+GENOME_MAP_PATH  = PROJECT_ROOT / "dirtywork" / "genome_id_map.json"
+GENOME_TAGS_PATH = PROJECT_ROOT / "dirtywork" / "data" / "ml-25m" / "genome-tags.csv"
+DENSE_HNSW_PATH  = PROJECT_ROOT / "dirtywork" / "dense_v2.hnsw"
+DENSE_MAP_PATH   = PROJECT_ROOT / "dirtywork" / "dense_v2_id_map.json"
+
+VOYAGE_MODEL  = "voyage-4-large"
+RRF_K         = 60
+LANE_K        = 100
 
 _SPLIT_RE = re.compile(r"[^a-z0-9]+")
 
 
-def tokenize(text: str) -> list[str]:
-    """Lowercase, split on non-alphanumeric, drop empty tokens."""
+def tokenize(text):
     return [t for t in _SPLIT_RE.split(text.lower()) if t]
 
 
 class CineVaultRetriever:
-    """
-    Core search engine combining BM25, Genome HNSW, and Dense Voyage HNSW.
-    """
 
-    def __init__(
-        self,
-        voyage_api_key: str | None = None,
-        load_dense: bool = True,
-    ) -> None:
+    def __init__(self, voyage_api_key=None, load_dense=True):
         t0 = time.time()
-        print("Initializing CineVault Retriever ...")
+        logger.info("Initializing CineVault Retriever ...")
 
-        # ── 1. Load Lane 1: BM25 ─────────────────────────────────────
         if not BM25_INDEX_PATH.exists():
-            raise FileNotFoundError(f"[ERROR] {BM25_INDEX_PATH} not found. Run Step 1 first.")
+            raise FileNotFoundError(f"BM25 index missing: {BM25_INDEX_PATH}. Run ETL first.")
         with open(BM25_INDEX_PATH, "rb") as f:
             bm25_data = pickle.load(f)
-        self.bm25       = bm25_data["bm25"]
+        self.bm25        = bm25_data["bm25"]
         self.bm25_corpus = bm25_data["corpus"]
         self.bm25_id_map = bm25_data["id_map"]
-        print(f"  ✓ Lane 1 (BM25) loaded: {len(self.bm25_id_map):,} docs")
+        logger.info(f"  ✓ Lane 1 (BM25): {len(self.bm25_id_map):,} docs")
 
-        # ── 2. Load Lane 2: Genome HNSW ──────────────────────────────
         if not GENOME_HNSW_PATH.exists():
-            raise FileNotFoundError(f"[ERROR] {GENOME_HNSW_PATH} not found. Run Step 2 first.")
+            raise FileNotFoundError(f"Genome HNSW missing: {GENOME_HNSW_PATH}. Run ETL first.")
         with open(GENOME_MAP_PATH, encoding="utf-8") as f:
             self.genome_id_map = json.load(f)
-
-        self.genome_dim = 1128
+        self.genome_dim   = 1128
         self.genome_index = hnswlib.Index(space="cosine", dim=self.genome_dim)
         self.genome_index.load_index(str(GENOME_HNSW_PATH), max_elements=len(self.genome_id_map))
         self.genome_index.set_ef(100)
-        print(f"  ✓ Lane 2 (Genome HNSW) loaded: {len(self.genome_id_map):,} vectors")
+        logger.info(f"  ✓ Lane 2 (Genome HNSW): {len(self.genome_id_map):,} vectors")
 
-        # Load genome tag dictionary (tag -> index 0..1127)
         self.tag_to_idx: dict[str, int] = {}
+        self.tag_patterns: dict[str, re.Pattern] = {}
         if GENOME_TAGS_PATH.exists():
             with open(GENOME_TAGS_PATH, encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                for row in reader:
-                    tag_name = row["tag"].strip().lower()
-                    tag_id   = int(row["tagId"]) - 1  # 1-indexed -> 0-indexed
-                    self.tag_to_idx[tag_name] = tag_id
-        print(f"  ✓ Genome vocabulary loaded: {len(self.tag_to_idx):,} tags")
+                for row in csv.DictReader(f):
+                    tag_clean = row["tag"].strip().lower()
+                    idx = int(row["tagId"]) - 1
+                    self.tag_to_idx[tag_clean] = idx
+                    self.tag_patterns[tag_clean] = re.compile(r"\b" + re.escape(tag_clean) + r"\b")
+        logger.info(f"  ✓ Genome vocabulary: {len(self.tag_to_idx):,} tags")
 
-        # ── 3. Load Lane 3: Dense HNSW ───────────────────────────────
-        self.dense_index = None
+        self.dense_index  = None
         self.dense_id_map = []
         self.voyage_client = None
 
         if load_dense and DENSE_HNSW_PATH.exists():
             with open(DENSE_MAP_PATH, encoding="utf-8") as f:
                 self.dense_id_map = json.load(f)
-            self.dense_dim = 1024
+            self.dense_dim   = 1024
             self.dense_index = hnswlib.Index(space="cosine", dim=self.dense_dim)
             self.dense_index.load_index(str(DENSE_HNSW_PATH), max_elements=len(self.dense_id_map))
             self.dense_index.set_ef(100)
 
-            # Check API key
-            api_key = voyage_api_key or os.environ.get("VOYAGE_API_KEY", "").strip() or "pa-EF1FgBNa-qvVdqEZstrRq4iyD2uq7KorI7EPaL8v5wn"
+            api_key = voyage_api_key or os.environ.get("VOYAGE_API_KEY", "").strip()
             if api_key:
                 try:
                     import voyageai
                     self.voyage_client = voyageai.Client(api_key=api_key)
-                    print(f"  ✓ Lane 3 (Dense HNSW + Voyage AI) loaded: {len(self.dense_id_map):,} vectors")
+                    logger.info(f"  ✓ Lane 3 (Dense + Voyage): {len(self.dense_id_map):,} vectors")
                 except Exception as e:
-                    print(f"  [WARN] Failed to initialize Voyage AI client ({e}). Lane 3 disabled.")
+                    logger.warning(f"  Voyage client failed ({e}). Lane 3 disabled.")
             else:
-                print("  [INFO] VOYAGE_API_KEY not set. Using local BM25 + Genome HNSW (0 Cloud API Cost).")
+                logger.info("  Lane 3 disabled — no VOYAGE_API_KEY.")
 
-        print(f"Retriever initialized in {time.time() - t0:.2f}s.\n")
+        logger.info(f"Retriever ready in {time.time() - t0:.2f}s.")
 
-    # -----------------------------------------------------------------------
-    # Query vector building for Lane 2 (Genome HNSW)
-    # -----------------------------------------------------------------------
-    def build_genome_query_vector(self, query: str) -> np.ndarray:
-        """
-        Build a 1,128-dim sparse normalized query vector from query text by matching tags.
-        Matches exact tag names as well as individual token matches.
-        """
+    def build_genome_query_vector(self, query):
         vec = np.zeros(self.genome_dim, dtype=np.float32)
-        q_lower = query.lower().strip()
+        q_lower  = query.lower().strip()
         q_tokens = set(tokenize(query))
 
-        # Check full query match
         if q_lower in self.tag_to_idx:
             vec[self.tag_to_idx[q_lower]] += 3.0
 
-        # Check sub-phrases & single token matches
         for tag, idx in self.tag_to_idx.items():
-            if tag in q_lower:
+            pattern = self.tag_patterns.get(tag) or re.compile(r"\b" + re.escape(tag) + r"\b")
+            if pattern.search(q_lower):
                 vec[idx] += 2.0
             else:
-                # token overlap
-                tag_tokens = set(tokenize(tag))
-                overlap = len(q_tokens & tag_tokens)
+                overlap = len(q_tokens & set(tokenize(tag)))
                 if overlap > 0:
                     vec[idx] += 0.5 * overlap
 
@@ -164,113 +125,68 @@ class CineVaultRetriever:
             vec /= norm
         return vec
 
-    # -----------------------------------------------------------------------
-    # Multi-Lane Search
-    # -----------------------------------------------------------------------
-    def search_lane1_bm25(self, query: str, top_k: int = DEFAULT_LANE_K) -> list[tuple[int, float]]:
-        """Run BM25 search over Tier A text documents."""
+    def search_lane1_bm25(self, query, top_k=LANE_K):
         tokens = tokenize(query)
         if not tokens:
             return []
         scores = self.bm25.get_scores(tokens)
-        top_indices = sorted(range(len(scores)), key=lambda i: -scores[i])[:top_k]
-        return [(self.bm25_id_map[i], float(scores[i])) for i in top_indices if scores[i] > 0]
+        if not isinstance(scores, np.ndarray):
+            scores = np.asarray(scores)
 
-    def search_lane2_genome(self, query: str, top_k: int = DEFAULT_LANE_K) -> list[tuple[int, float]]:
-        """Run Genome HNSW search over Tier A + B tag relevance vectors."""
+        if len(scores) <= top_k:
+            top_idx = np.argsort(-scores)
+        else:
+            partition = np.argpartition(-scores, top_k)[:top_k]
+            top_idx = partition[np.argsort(-scores[partition])]
+
+        return [(self.bm25_id_map[i], float(scores[i])) for i in top_idx if scores[i] > 0]
+
+    def search_lane2_genome(self, query, top_k=LANE_K):
         q_vec = self.build_genome_query_vector(query)
         if np.linalg.norm(q_vec) < 1e-10:
-            return []  # no tag match found
+            return []
         labels, dists = self.genome_index.knn_query([q_vec], k=top_k)
-        results = []
-        for lbl, dist in zip(labels[0], dists[0]):
-            mid = self.genome_id_map[int(lbl)]
-            # dist is cosine distance = 1 - cosine_similarity
-            score = max(0.0, 1.0 - float(dist))
-            results.append((mid, score))
-        return results
+        return [
+            (self.genome_id_map[int(lbl)], max(0.0, 1.0 - float(dist)))
+            for lbl, dist in zip(labels[0], dists[0])
+        ]
 
-    def search_lane3_dense(self, query: str, top_k: int = DEFAULT_LANE_K) -> list[tuple[int, float]]:
-        """Run Dense Voyage-4-Large HNSW search over Tier A semantic vectors."""
+    def search_lane3_dense(self, query, top_k=LANE_K):
         if not self.dense_index or not self.voyage_client:
             return []
-
-        # Embed query text
-        res = self.voyage_client.embed([query], model=VOYAGE_MODEL, input_type="query")
+        res   = self.voyage_client.embed([query], model=VOYAGE_MODEL, input_type="query")
         q_vec = np.array(res.embeddings[0], dtype=np.float32)
-
         labels, dists = self.dense_index.knn_query([q_vec], k=top_k)
-        results = []
-        for lbl, dist in zip(labels[0], dists[0]):
-            mid = self.dense_id_map[int(lbl)]
-            score = max(0.0, 1.0 - float(dist))
-            results.append((mid, score))
-        return results
+        return [
+            (self.dense_id_map[int(lbl)], max(0.0, 1.0 - float(dist)))
+            for lbl, dist in zip(labels[0], dists[0])
+        ]
 
-    # -----------------------------------------------------------------------
-    # Fused Search (RRF)
-    # -----------------------------------------------------------------------
-    def search(
-        self,
-        query: str,
-        top_k: int = 20,
-        lane_k: int = DEFAULT_LANE_K,
-        k_rrf: int = RRF_K,
-        use_voyage: bool = True,
-    ) -> list[dict]:
-        """
-        Perform multi-lane search and merge results using Reciprocal Rank Fusion.
-        """
-        # Execute active lanes
-        lane_results = {
-            "bm25":   self.search_lane1_bm25(query, top_k=lane_k),
+    def search(self, query, top_k=20, lane_k=LANE_K, k_rrf=RRF_K,
+               use_voyage=True, bm25_query=None):
+        lanes = {
+            "bm25":   self.search_lane1_bm25(bm25_query or query, top_k=lane_k),
             "genome": self.search_lane2_genome(query, top_k=lane_k),
             "dense":  self.search_lane3_dense(query, top_k=lane_k) if (use_voyage and self.voyage_client) else [],
         }
 
         rrf_scores = defaultdict(float)
-        lane_hits = defaultdict(dict)
+        lane_hits  = defaultdict(dict)
 
-        for lane_name, hits in lane_results.items():
-            for rank, (mid, _score) in enumerate(hits):
-                # RRF formula: 1.0 / (k + rank + 1)
+        for lane_name, hits in lanes.items():
+            for rank, (mid, _) in enumerate(hits):
                 rrf_scores[mid] += 1.0 / (k_rrf + rank + 1)
-                lane_hits[mid][lane_name] = rank + 1  # 1-indexed rank for display
+                lane_hits[mid][lane_name] = rank + 1
 
-        # Sort by fused score descending
-        sorted_mids = sorted(rrf_scores.keys(), key=lambda m: -rrf_scores[m])[:top_k]
+        sorted_mids = sorted(rrf_scores, key=lambda m: -rrf_scores[m])[:top_k]
 
-        output = []
-        for mid in sorted_mids:
-            ranks = lane_hits[mid]
-            output.append({
-                "movie_id": mid,
+        return [
+            {
+                "movie_id":  mid,
+                "rrf_rank":  idx + 1,
                 "rrf_score": round(rrf_scores[mid], 5),
-                "lanes": list(ranks.keys()),
-                "lane_ranks": ranks,
-            })
-
-        return output
-
-
-# ---------------------------------------------------------------------------
-# CLI test runner
-# ---------------------------------------------------------------------------
-def main():
-    query = " ".join(sys.argv[1:]) if len(sys.argv) > 1 else "atmospheric slow burn Korean thriller"
-    retriever = CineVaultRetriever()
-
-    print(f"Query: '{query}'")
-    print("=" * 60)
-    t0 = time.time()
-    results = retriever.search(query, top_k=10)
-    elapsed = time.time() - t0
-
-    print(f"Found {len(results)} results in {elapsed*1000:.1f}ms:\n")
-    for rank, res in enumerate(results, 1):
-        lanes_str = ", ".join(f"{l}:#{r}" for l, r in res["lane_ranks"].items())
-        print(f" #{rank:2d}  movie_id={res['movie_id']:6d}  score={res['rrf_score']:.5f}  [{lanes_str}]")
-
-
-if __name__ == "__main__":
-    main()
+                "lanes":     list(lane_hits[mid]),
+                "lane_ranks": lane_hits[mid],
+            }
+            for idx, mid in enumerate(sorted_mids)
+        ]

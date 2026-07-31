@@ -1,24 +1,24 @@
 """
-interface/tui/screens/search.py — Unified Search Hub Screen for CineVault TUI
+interface/tui/screens/search.py — Search & Recommendation Screen for CineVault TUI
 """
 
 import asyncio
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Checkbox, DataTable, Header, Input, Label, Static
+from textual.widgets import Button, DataTable, Header, Input, Rule, Static
 
 
 class SearchScreen(Screen):
     """
-    Unified Search Hub Screen.
-    Contains Query Bar, Personalization Dial (λ), Exclude Watched toggle, and Results DataTable.
+    Search & Recommendation Screen.
+    Contains Header, Title, Search Bar, Status Bar, and Recommendations DataTable.
+    Automatically displays Top 10 Personalized Recommendations on mount.
     """
 
     BINDINGS = [
         ("ctrl+s", "focus_search", "Focus Search"),
-        ("ctrl+o", "open_onboarding", "Onboarding"),
         ("enter", "inspect_selected", "Inspect Movie"),
         ("r", "review_selected", "Review Movie"),
     ]
@@ -31,33 +31,24 @@ class SearchScreen(Screen):
         yield Header(show_clock=True)
         yield Container(
             Vertical(
-                # Title Banner
-                Static("🍿 CINEVAULT :: RETRO NEURAL RECOMMENDATION ENGINE", id="app-banner"),
-                
-                # Query Bar Container
+                # Title — plain text, no decorative border box
+                Static("CINEVAULT", id="app-title"),
+                Rule(id="app-title-rule"),
+
+                # Query Bar
                 Horizontal(
                     Input(
-                        placeholder="🔍 Enter natural language prompt (e.g. 'dark mind-bending sci-fi thriller')...",
+                        placeholder="Search for movies (e.g. 'dark slow tension horror', 'mind-bending sci-fi')...",
                         id="query-input"
                     ),
-                    Button("🔍 SEARCH", id="btn-search", variant="primary"),
+                    Button("SEARCH", id="btn-search"),
                     id="query-bar"
                 ),
-                
-                # Interactive Controls Bar
-                Horizontal(
-                    Label("λ Personalization Dial:"),
-                    Input(value="0.7", id="input-lambda", classes="compact-input"),
-                    Checkbox("Exclude Watched", value=True, id="chk-exclude-watched"),
-                    Button("⚡ Onboarding Wizard", id="btn-onboard", variant="default"),
-                    Static("👤 Active User: [default_user]", id="user-badge"),
-                    id="controls-bar"
-                ),
 
-                # Loading Status Bar
-                Static("Ready. Type a query above and press Enter to search.", id="status-bar"),
+                # Status Bar
+                Static("Ready.", id="status-bar"),
 
-                # Live Results DataTable
+                # Recommendations DataTable
                 DataTable(id="results-table", cursor_type="row"),
                 id="search-container"
             ),
@@ -71,62 +62,36 @@ class SearchScreen(Screen):
         table.add_column("IMDb Rating", key="rating")
         table.add_column("Genres", key="genres")
         table.add_column("Score", key="score")
-        table.add_column("RRF Pool Rank", key="rrf_rank")
-        
+
         # Default focus on query input
         self.query_one("#query-input", Input).focus()
+
+        # Load default top 10 recommendations based on user profile on screen mount
+        self.run_search(initial_load=True)
 
     def action_focus_search(self) -> None:
         self.query_one("#query-input", Input).focus()
 
-    def action_open_onboarding(self) -> None:
-        from interface.tui.modals.onboarding import ColdStartOnboardingModal
-        self.app.push_screen(ColdStartOnboardingModal())
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-search":
             self.run_search()
-        elif event.button.id == "btn-onboard":
-            self.action_open_onboarding()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "query-input":
             self.run_search()
-        elif event.input.id == "input-lambda":
-            self.update_lambda_setting()
 
-    def update_lambda_setting(self) -> None:
-        val_str = self.query_one("#input-lambda", Input).value
-        try:
-            val = float(val_str)
-            val = max(0.0, min(1.0, val))
-            controller = getattr(self.app, "controller", None)
-            if controller:
-                controller.set_lambda(val)
-                self.notify(f"Personalization λ set to {val:.2f}", title="Settings Updated")
-        except ValueError:
-            pass
-
-    def run_search(self) -> None:
+    def run_search(self, initial_load: bool = False) -> None:
         query_text = self.query_one("#query-input", Input).value.strip()
-        if not query_text:
-            return
 
         status = self.query_one("#status-bar", Static)
-        status.update(f"⏳ Searching CineVault for '{query_text}'...")
+        if query_text:
+            status.update(f"Searching CineVault for '{query_text}'...")
+        else:
+            status.update("Loading top 10 recommended movies based on your profile...")
 
-        self.update_lambda_setting()
+        self.run_worker(self._async_search_task(query_text, initial_load), exclusive=True)
 
-        # Update exclude watched setting
-        chk_watched = self.query_one("#chk-exclude-watched", Checkbox).value
-        controller = getattr(self.app, "controller", None)
-        if controller:
-            controller.set_exclude_watched(chk_watched)
-
-        # Run non-blocking search task
-        self.run_worker(self._async_search_task(query_text), exclusive=True)
-
-    async def _async_search_task(self, query_text: str) -> None:
+    async def _async_search_task(self, query_text: str, initial_load: bool = False) -> None:
         controller = getattr(self.app, "controller", None)
         if not controller:
             return
@@ -136,24 +101,34 @@ class SearchScreen(Screen):
         elapsed_ms = (asyncio.get_event_loop().time() - t0) * 1000
 
         self.current_results = results
-        self.populate_results(results, query_text, elapsed_ms)
+        self.populate_results(results, query_text, elapsed_ms, initial_load)
 
-    def populate_results(self, results: List[Dict[str, Any]], query_text: str, elapsed_ms: float) -> None:
+    def populate_results(
+        self,
+        results: List[Dict[str, Any]],
+        query_text: str,
+        elapsed_ms: float,
+        initial_load: bool = False
+    ) -> None:
         table = self.query_one("#results-table", DataTable)
         table.clear()
 
         status = self.query_one("#status-bar", Static)
-        status.update(f"✓ Found {len(results)} recommendations for '{query_text}' in {elapsed_ms:.1f}ms.")
+        user_id = getattr(getattr(self.app, "controller", None), "user_id", "default_user")
+
+        if query_text:
+            status.update(f"Found {len(results)} recommendations for '{query_text}' in {elapsed_ms:.1f}ms.")
+        else:
+            status.update(f"Top 10 Recommended Movies for [{user_id}] (Profile-Based)")
 
         for idx, item in enumerate(results, 1):
             final_rank = str(item.get("final_rank", idx))
             title = f"{item.get('title', 'Unknown')} ({item.get('year', '')})"
-            rating = f"★ {item['avg_rating']:.2f}" if item.get("avg_rating") else "★ Unrated"
+            rating = f"★ {item['avg_rating']:.2f}" if item.get("avg_rating") else "Unrated"
             genres = ", ".join(item.get("genres", [])[:3])
             score = f"{item.get('final_score', 0.0):.4f}"
-            rrf_rank = f"#{item.get('rrf_rank', '-')}"
 
-            table.add_row(final_rank, title, rating, genres, score, rrf_rank, key=str(item.get("movie_id", idx)))
+            table.add_row(final_rank, title, rating, genres, score, key=str(item.get("movie_id", idx)))
 
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self.action_inspect_selected()

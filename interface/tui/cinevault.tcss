@@ -1,0 +1,648 @@
+/* ═══════════════════════════════════════════════════════════════
+   cinevault.tcss — Phosphor Console Design System
+   ═══════════════════════════════════════════════════════════════
+
+   Color tokens (applied via Textual Theme variables):
+     $background         #0B0B0D   App canvas (Level 0)
+     $surface            #141417   Panels, table body (Level 1)
+     $panel              #1C1C20   Modals, raised dialogs (Level 2 = surface-high)
+     $primary            #8AB4F8   Focus, selection, primary action
+     $primary-muted      #1B3A63   primary-container: selected rows, active chips
+     $secondary          #E8B339   Warning / caution only
+     $foreground         #E3E3E6   on-surface: primary text
+     $foreground-muted   #9B9BA1   on-surface-variant: labels, meta
+     $success            #7CC894   Confirmations only
+     $error              #E5534B   Destructive only
+     $accent             #E8B339   (aliases $secondary for warning)
+
+   Typography: Title=bold on-surface, Body=regular on-surface,
+               Label=regular on-surface-variant, Hint=italic on-surface-variant
+
+   Elevation: Level 0=bg, Level 1=surface, Level 2=panel (surface-high).
+              Borders: single round on outermost modal edge only.
+
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── GLOBAL ──────────────────────────────────────────────────── */
+
+Screen {
+    background: $background;
+    color: $foreground;
+}
+
+/* ── HEADER ──────────────────────────────────────────────────── */
+
+Header {
+    background: $surface;
+    color: $foreground-muted;
+    text-style: none;
+}
+
+/* ── MAIN WRAPPER ────────────────────────────────────────────── */
+
+#main-screen-wrapper {
+    background: $background;
+}
+
+#search-container {
+    background: $background;
+}
+
+/* ── APP TITLE ───────────────────────────────────────────────── */
+
+#app-title {
+    background: $background;
+    color: $foreground;
+    text-align: center;
+    text-style: bold;
+    padding: 1 2;
+    height: 3;
+}
+
+#app-title-rule {
+    color: $foreground-muted;
+    margin: 0 2;
+}
+
+/* ── QUERY BAR ───────────────────────────────────────────────── */
+
+#query-bar {
+    padding: 1 1;
+    height: 5;
+    background: $background;
+}
+
+#query-input {
+    width: 1fr;
+    border: tall $foreground-muted;
+    background: $surface;
+    color: $foreground;
+    padding: 0 1;
+}
+
+#query-input:focus {
+    border: tall $primary;
+    color: $foreground;
+    background: $surface;
+}
+
+#query-input > .input--placeholder {
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+/* ── SEARCH BUTTON ───────────────────────────────────────────── */
+
+#btn-search {
+    width: 16;
+    margin-left: 1;
+    background: $primary;
+    color: #06305F;
+    border: none;
+    text-style: bold;
+}
+
+#btn-search:hover {
+    background: $primary;
+    color: #06305F;
+}
+
+#btn-search:focus {
+    background: $primary;
+    color: #06305F;
+}
+
+/* ── STATUS BAR ──────────────────────────────────────────────── */
+
+#status-bar {
+    padding: 0 2;
+    height: 1;
+    background: $background;
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+/* ── RESULTS DATATABLE ───────────────────────────────────────── */
+
+#results-table {
+    height: 1fr;
+    background: $surface;
+    border: none;
+}
+
+DataTable > .datatable--header {
+    background: $surface;
+    color: $foreground;
+    text-style: bold;
+}
+
+DataTable > .datatable--cursor {
+    background: $primary-muted;
+    color: $foreground;
+    text-style: none;
+}
+
+DataTable > .datatable--even-row {
+    background: $surface;
+}
+
+DataTable > .datatable--odd-row {
+    background: $background;
+}
+
+DataTable > .datatable--hover {
+    background: $panel;
+    color: $foreground;
+}
+
+/* ── MODAL SHARED WRAPPER ────────────────────────────────────── */
+
+#modal-wrapper {
+    align: center middle;
+    background: $background 85%;
+}
+
+/* ── INSPECTOR MODAL ─────────────────────────────────────────── */
+
+#inspector-container {
+    width: 92;
+    height: 36;
+    background: $panel;
+    border: round $foreground-muted;
+    padding: 1 2;
+}
+
+#inspector-title {
+    color: $foreground;
+    text-style: bold;
+    text-align: left;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#inspector-content {
+    height: 1fr;
+}
+
+#inspector-poster-box {
+    width: 30;
+    height: 100%;
+    margin-right: 2;
+    background: $panel;
+}
+
+#inspector-text-box {
+    width: 1fr;
+    height: 100%;
+}
+
+#inspector-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $panel;
+}
+
+#inspector-buttons {
+    height: 3;
+    align: center middle;
+}
+
+/* ── REVIEW MODAL ────────────────────────────────────────────── */
+
+#review-container {
+    width: 84;
+    height: 36;
+    background: $panel;
+    border: round $foreground-muted;
+    padding: 1 2;
+}
+
+#review-title {
+    color: $foreground;
+    text-style: bold;
+    text-align: left;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#review-scroll-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $panel;
+}
+
+#review-progress {
+    height: 1;
+    color: $foreground-muted;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+#review-buttons {
+    height: 3;
+    align: center middle;
+}
+
+/* Aspect chip buttons */
+.aspect-chip {
+    width: 1fr;
+    margin: 0 0 1 0;
+    background: $surface;
+    color: $foreground;
+    border: none;
+    text-style: none;
+}
+
+.aspect-chip:hover {
+    background: $panel;
+    color: $foreground;
+}
+
+.aspect-chip.-selected {
+    background: $primary-muted;
+    color: $foreground;
+    text-style: none;
+}
+
+RadioSet {
+    background: $panel;
+    border: none;
+    padding: 0 1;
+}
+
+RadioButton {
+    color: $foreground-muted;
+    background: $panel;
+}
+
+RadioButton:focus {
+    color: $primary;
+}
+
+RadioButton.-on {
+    color: $primary;
+    text-style: none;
+}
+
+/* Review text area */
+#review-text-input {
+    min-height: 3;
+    background: $surface;
+    color: $foreground;
+    border: tall $foreground-muted;
+}
+
+#review-text-input:focus {
+    border: tall $primary;
+}
+
+#review-text-input > .text-area--cursor {
+    color: $primary;
+}
+
+/* ── ONBOARDING MODAL ────────────────────────────────────────── */
+
+#onboard-container {
+    width: 84;
+    height: 30;
+    background: $panel;
+    border: round $foreground-muted;
+    padding: 1 2;
+}
+
+#onboard-title {
+    color: $foreground;
+    text-style: bold;
+    text-align: left;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#onboard-scroll-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $panel;
+}
+
+#onboard-buttons {
+    height: 3;
+    align: center middle;
+}
+
+Checkbox {
+    color: $foreground;
+    background: $panel;
+    margin: 0 1;
+}
+
+Checkbox:focus {
+    color: $primary;
+}
+
+Checkbox.-on {
+    color: $primary;
+    text-style: none;
+}
+
+/* ── PROFILE SCREEN ──────────────────────────────────────────── */
+
+#profile-wrapper {
+    background: $background;
+}
+
+#profile-container {
+    background: $background;
+    padding: 1 2;
+}
+
+#profile-title {
+    color: $foreground;
+    text-style: bold;
+    text-align: center;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#profile-scroll-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $background;
+}
+
+.section-title {
+    color: $foreground;
+    text-style: bold;
+    margin: 1 0 0 0;
+}
+
+.signal-row {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+.signal-label {
+    color: $foreground-muted;
+    width: 20;
+    text-style: none;
+}
+
+.seg-button {
+    margin: 0 0;
+    background: $surface;
+    color: $foreground-muted;
+    border: none;
+    text-style: none;
+    min-width: 12;
+}
+
+.seg-button:hover {
+    background: $panel;
+    color: $foreground;
+}
+
+.seg-button.-active {
+    background: $primary;
+    color: #06305F;
+    text-style: bold;
+}
+
+.memory-item {
+    height: auto;
+    padding: 0 1;
+    background: $surface;
+    margin: 0 0 1 0;
+}
+
+.memory-text {
+    width: 1fr;
+    color: $foreground;
+    text-style: none;
+}
+
+.memory-delete {
+    background: transparent;
+    color: $foreground-muted;
+    border: none;
+    text-style: none;
+    width: 5;
+}
+
+.memory-delete:hover {
+    color: $error;
+}
+
+#profile-buttons {
+    height: 3;
+    align: center middle;
+}
+
+/* ── PREFERENCES MODAL (legacy, kept for compat) ─────────────── */
+
+#pref-container {
+    width: 84;
+    height: 36;
+    background: $panel;
+    border: round $foreground-muted;
+    padding: 1 2;
+}
+
+#pref-scroll-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $panel;
+}
+
+#pref-buttons {
+    height: 3;
+    align: center middle;
+}
+
+/* ── RULE WIDGET ─────────────────────────────────────────────── */
+
+Rule {
+    color: $foreground-muted;
+    margin: 0 0 1 0;
+}
+
+/* ── LABELS ──────────────────────────────────────────────────── */
+
+Label {
+    color: $foreground;
+    text-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+/* ── BUTTONS — THREE-TIER EMPHASIS ───────────────────────────── */
+
+Button {
+    margin: 0 1;
+    text-style: bold;
+    border: none;
+}
+
+/* Filled (primary action) */
+Button.-filled {
+    background: $primary;
+    color: #06305F;
+    border: none;
+}
+
+Button.-filled:hover {
+    background: $primary;
+    color: #06305F;
+}
+
+/* Outlined (secondary action) */
+Button.-outlined {
+    background: transparent;
+    color: $primary;
+    border: tall $primary;
+}
+
+Button.-outlined:hover {
+    background: $primary-muted;
+    color: $primary;
+    border: tall $primary;
+}
+
+/* Ghost / text (low-emphasis) */
+Button.-ghost {
+    background: transparent;
+    color: $foreground-muted;
+    border: none;
+}
+
+Button.-ghost:hover {
+    background: $surface;
+    color: $foreground;
+}
+
+/* Destructive (error role — genuinely destructive actions only) */
+Button.-destructive {
+    background: transparent;
+    color: $error;
+    border: tall $error;
+}
+
+Button.-destructive:hover {
+    background: $error;
+    color: #2A0605;
+    border: tall $error;
+}
+
+/* Legacy Textual variants — map to new tiers */
+Button.-success {
+    background: $primary;
+    color: #06305F;
+    border: none;
+}
+
+Button.-success:hover {
+    background: $primary;
+    color: #06305F;
+}
+
+Button.-error {
+    background: transparent;
+    color: $foreground-muted;
+    border: none;
+}
+
+Button.-error:hover {
+    background: $surface;
+    color: $foreground;
+}
+
+Button.-primary {
+    background: transparent;
+    color: $primary;
+    border: tall $primary;
+}
+
+Button.-primary:hover {
+    background: $primary-muted;
+    color: $primary;
+}
+
+Button.-default {
+    background: transparent;
+    color: $foreground-muted;
+    border: none;
+}
+
+Button.-default:hover {
+    background: $surface;
+    color: $foreground;
+}
+
+/* ── INPUT — GLOBAL ──────────────────────────────────────────── */
+
+Input {
+    border: tall $foreground-muted;
+    background: $surface;
+    color: $foreground;
+}
+
+Input:focus {
+    border: tall $primary;
+    color: $foreground;
+}
+
+Input > .input--placeholder {
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+/* ── TEXTAREA — GLOBAL ───────────────────────────────────────── */
+
+TextArea {
+    background: $surface;
+    color: $foreground;
+    border: tall $foreground-muted;
+}
+
+TextArea:focus {
+    border: tall $primary;
+}
+
+/* ── MARKDOWN ────────────────────────────────────────────────── */
+
+Markdown {
+    background: $panel;
+    color: $foreground;
+}
+
+/* ── SCROLLBAR ───────────────────────────────────────────────── */
+
+ScrollBar {
+    background: $surface;
+    color: $foreground-muted;
+}
+
+ScrollBar:hover {
+    color: $primary;
+}
+
+/* ── LOADING INDICATOR ───────────────────────────────────────── */
+
+LoadingIndicator {
+    color: $primary;
+    background: $background;
+}
+
+/* ── COMPACT INPUT (controls bar) ────────────────────────────── */
+
+.compact-input {
+    width: 8;
+    margin-right: 2;
+    background: $surface;
+    color: $foreground;
+    border: tall $foreground-muted;
+}
+
+.compact-input:focus {
+    border: tall $primary;
+    color: $foreground;
+}

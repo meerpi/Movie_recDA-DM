@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-"""
-user_profile/review_processor.py — Step 11: Dual-Path User Review Extractor & Profile Tuner
+"""user_profile/review_processor.py — Dual-path review signal extraction.
 
-Extracts multi-dimensional taste signals from user ratings, surgical TUI checkboxes,
-and natural language text reviews into structured `UserProfile` updates.
-
-Features:
-  • Path A (Surgical Checkboxes): Direct credit assignment for user-selected attributes.
-  • Primary LLM Extractor (Gemini Flash): Structured JSON extraction matching Tier A card vocabulary.
-  • Path B (Local Non-LLM Fallback): RapidFuzz fuzzy tag matching & sarcasm polarity heuristics when offline.
+Primary: Gemini Flash structured JSON extraction.
+Fallback: local keyword + tag matching with sarcasm polarity heuristics.
 """
 
 import json
@@ -16,11 +9,9 @@ import logging
 import os
 import re
 import time
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional
 
-from rapidfuzz import fuzz, process
-from user_profile.schema import UserProfile
+from user_profile.schema import UserProfile, _clamp
 
 logger = logging.getLogger("cinevault.review_processor")
 
@@ -50,84 +41,79 @@ Return ONLY a JSON object matching this exact schema:
 """
 
 
+def _normalize_aspect(aspect):
+    if isinstance(aspect, str):
+        cleaned = aspect.strip().lower()
+        if cleaned:
+            return cleaned
+    return None
+
+
 class NonLLMReviewProcessor:
 
-    def __init__(self, tag_vocabulary: Optional[List[str]] = None):
+    def __init__(self, tag_vocabulary=None):
         self.tag_vocabulary = tag_vocabulary or []
 
-    def detect_sarcasm_risk(self, review_text: str, star_rating: float) -> float:
-        """
-        Calculates sarcasm risk (0.0 to 1.0) based on star rating vs text polarity contradiction.
-        """
+    def detect_sarcasm_risk(self, review_text, star_rating):
+        """Sarcasm risk (0-1) based on star rating vs text polarity contradiction."""
         text_lower = review_text.lower()
         lexical_hits = sum(bool(re.search(p, text_lower)) for p in SARCASM_PATTERNS)
 
-        # Star rating normalized (1.0..5.0 -> 0.0..1.0)
         star_norm = (star_rating - 1.0) / 4.0
 
         pos_count = sum(1 for w in POSITIVE_WORDS if w in text_lower)
         neg_count = sum(1 for w in NEGATIVE_WORDS if w in text_lower)
 
-        total_sentiment_words = pos_count + neg_count
-        if total_sentiment_words > 0:
-            text_polarity = (pos_count - neg_count) / total_sentiment_words
+        total = pos_count + neg_count
+        if total > 0:
+            text_polarity = (pos_count - neg_count) / total
         else:
             text_polarity = 0.0
 
-        text_norm = (text_polarity + 1.0) / 2.0  # -1..+1 -> 0..1
+        text_norm = (text_polarity + 1.0) / 2.0
         contradiction = abs(text_norm - star_norm)
-        risk = min(1.0, contradiction * 0.7 + 0.3 * lexical_hits)
-        return risk
+        return min(1.0, contradiction * 0.7 + 0.3 * lexical_hits)
 
-    def extract_fuzzy_genome_tags(self, review_text: str, cutoff: int = 82) -> Dict[str, float]:
-        """
-        Extracts matching genome tags using fuzzy character similarity (RapidFuzz).
-        Robust against typos and non-native English (e.g. "beautifull", "psycological").
-        """
+    def extract_fuzzy_genome_tags(self, review_text, cutoff=82):
         if not self.tag_vocabulary:
             return {}
 
-        tokens = re.findall(r"\b[a-zA-Z]{4,}\b", review_text.lower())
-        matched_tags = {}
+        text_lower = review_text.lower()
+        tokens = set(re.findall(r"\b[a-zA-Z]{3,}\b", text_lower))
+        matched = {}
 
-        for token in tokens:
-            match = process.extractOne(token, self.tag_vocabulary, scorer=fuzz.ratio, score_cutoff=cutoff)
-            if match:
-                tag, score, _ = match
-                matched_tags[tag] = max(matched_tags.get(tag, 0.0), score / 100.0)
+        for tag in self.tag_vocabulary:
+            tc = tag.lower()
+            if tc in tokens or (len(tc) > 4 and tc in text_lower):
+                matched[tag] = 1.0
 
-        return matched_tags
+        return matched
 
-    def process_review(
-        self,
-        profile: UserProfile,
-        movie_card: Dict[str, Any],
-        star_rating: float,
-        review_text: str = "",
-        surgical_aspects: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        """
-        Analyzes review text using local RapidFuzz heuristics and updates UserProfile.
-        """
+    def process_review(self, profile, movie_card, star_rating, review_text="",
+                       surgical_aspects=None):
         sarcasm_risk = self.detect_sarcasm_risk(review_text, star_rating) if review_text else 0.0
         fuzzy_tags = self.extract_fuzzy_genome_tags(review_text) if review_text else {}
         text_confidence = max(0.1, 1.0 - sarcasm_risk)
 
-        # 1. Base star rating update
-        profile.apply_rating_update(movie_card, star_rating=star_rating, review_confidence=1.0)
+        profile.apply_rating_update(movie_card, star_rating=star_rating, review_confidence=text_confidence)
 
-        # 2. Surgical checkbox credit assignment (Path A)
+        aspect_deltas: Dict[str, float] = {}
+
         if surgical_aspects:
-            mult = (star_rating - 3.0) / 2.0  # -1.0 to +1.0
+            mult = (star_rating - 3.0) / 2.0
             for aspect in surgical_aspects:
-                aspect_clean = aspect.lower().strip()
-                profile.tag_affinity[aspect_clean] = profile.tag_affinity.get(aspect_clean, 0.0) + mult * 0.4
+                norm = _normalize_aspect(aspect)
+                if norm and norm not in aspect_deltas:
+                    aspect_deltas[norm] = mult * 0.4
 
-        # 3. Fuzzy tag updates
         for tag, confidence in fuzzy_tags.items():
-            current_aff = profile.tag_affinity.get(tag, 0.0)
-            weight = (star_rating - 3.0) / 2.0 * confidence * text_confidence
-            profile.tag_affinity[tag] = current_aff + weight * 0.3
+            norm = _normalize_aspect(tag)
+            if norm and norm not in aspect_deltas:
+                w = (star_rating - 3.0) / 2.0 * confidence * text_confidence
+                aspect_deltas[norm] = w * 0.3
+
+        for aspect, delta in aspect_deltas.items():
+            profile.tag_affinity[aspect] = _clamp(profile.tag_affinity.get(aspect, 0.0) + delta)
 
         return {
             "mode": "non_llm_fallback",
@@ -136,15 +122,14 @@ class NonLLMReviewProcessor:
             "extracted_fuzzy_tags": list(fuzzy_tags.keys()),
             "surgical_aspects": surgical_aspects or [],
             "star_rating": star_rating,
+            "era_captured": bool(movie_card.get("year")),
+            "language_captured": bool(movie_card.get("original_language")),
         }
 
 
 class LLMReviewProcessor:
-    """
-    Dual-Path Review Processor combining Gemini LLM extraction with local RapidFuzz fallback.
-    """
 
-    def __init__(self, tag_vocabulary: Optional[List[str]] = None):
+    def __init__(self, tag_vocabulary=None):
         self.tag_vocabulary = tag_vocabulary or []
         self.fallback = NonLLMReviewProcessor(tag_vocabulary)
         self.client = None
@@ -154,39 +139,19 @@ class LLMReviewProcessor:
             try:
                 from google import genai
                 self.client = genai.Client()
-                logger.info("LLMReviewProcessor initialized with Gemini API client.")
+                logger.info("LLMReviewProcessor: Gemini client ready.")
             except Exception as e:
-                logger.warning(f"Failed to initialize Gemini genai client ({e}). LLM review extraction disabled.")
+                logger.warning(f"Gemini client init failed ({e}). LLM extraction disabled.")
         else:
-            logger.info("GEMINI_API_KEY not found. LLMReviewProcessor will use local Path B fallback.")
+            logger.info("No GEMINI_API_KEY. Using local fallback for reviews.")
 
-    def process_review(
-        self,
-        profile: UserProfile,
-        movie_card: Dict[str, Any],
-        star_rating: float,
-        review_text: str = "",
-        surgical_aspects: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        """
-        Processes user rating, surgical checkboxes, and natural language review text.
-        Fuses LLM extraction (Primary) with local fallback (Path B).
-        """
-        # Always apply surgical checkbox updates (Path A)
-        mult = (star_rating - 3.0) / 2.0  # -1.0 to +1.0
-        if surgical_aspects:
-            for aspect in surgical_aspects:
-                aspect_clean = aspect.lower().strip()
-                profile.tag_affinity[aspect_clean] = profile.tag_affinity.get(aspect_clean, 0.0) + mult * 0.5
-
-        # Base rating update
-        profile.apply_rating_update(movie_card, star_rating=star_rating)
-
-        # If no text provided or no API client available, use local path B
+    def process_review(self, profile, movie_card, star_rating, review_text="",
+                       surgical_aspects=None):
         if not review_text.strip() or not self.client:
             return self.fallback.process_review(profile, movie_card, star_rating, review_text, surgical_aspects)
 
-        # Execute LLM Extraction
+        mult = (star_rating - 3.0) / 2.0
+
         try:
             t0 = time.time()
             prompt = (
@@ -197,39 +162,77 @@ class LLMReviewProcessor:
                 f"User Review Text: \"{review_text}\""
             )
 
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=[REVIEW_LLM_PROMPT, prompt],
-                config={"response_mime_type": "application/json"},
-            )
+            response = None
+            for model in ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-flash-lite-latest"]:
+                try:
+                    response = self.client.models.generate_content(
+                        model=model,
+                        contents=[REVIEW_LLM_PROMPT, prompt],
+                        config={"response_mime_type": "application/json"},
+                    )
+                    if response and response.text:
+                        break
+                except Exception as _e:
+                    logger.debug(f"Review model {model} failed: {_e}")
+
+            if not response or not response.text:
+                return self.fallback.process_review(profile, movie_card, star_rating, review_text, surgical_aspects)
 
             llm_res = json.loads(response.text)
             latency_ms = round((time.time() - t0) * 1000, 2)
 
-            # Apply LLM extracted signals to profile
             sarcasm = llm_res.get("sarcasm_detected", False)
-            sentiment_score = llm_res.get("sentiment_score", mult)
+            sentiment = llm_res.get("sentiment_score", mult)
             confidence = 0.2 if sarcasm else 1.0
 
-            # Update liked / disliked aspects & tags
-            for aspect in llm_res.get("liked_aspects", []):
-                profile.tag_affinity[aspect.lower()] = profile.tag_affinity.get(aspect.lower(), 0.0) + 0.4 * confidence
-            for aspect in llm_res.get("disliked_aspects", []):
-                profile.tag_affinity[aspect.lower()] = profile.tag_affinity.get(aspect.lower(), 0.0) - 0.4 * confidence
-            for tag in llm_res.get("extracted_tags", []):
-                profile.tag_affinity[tag.lower()] = profile.tag_affinity.get(tag.lower(), 0.0) + (sentiment_score * 0.3 * confidence)
+            profile.apply_rating_update(movie_card, star_rating=star_rating, review_confidence=confidence)
 
-            # Director sentiment update
+            aspect_deltas: Dict[str, float] = {}
+
+            if surgical_aspects:
+                for aspect in surgical_aspects:
+                    norm = _normalize_aspect(aspect)
+                    if norm and norm not in aspect_deltas:
+                        aspect_deltas[norm] = mult * 0.5 * confidence
+
+            for aspect in (llm_res.get("liked_aspects") or []):
+                norm = _normalize_aspect(aspect)
+                if norm and norm not in aspect_deltas:
+                    aspect_deltas[norm] = 0.4 * confidence
+
+            for aspect in (llm_res.get("disliked_aspects") or []):
+                norm = _normalize_aspect(aspect)
+                if norm and norm not in aspect_deltas:
+                    aspect_deltas[norm] = -0.4 * confidence
+
+            for tag in (llm_res.get("extracted_tags") or []):
+                norm = _normalize_aspect(tag)
+                if norm and norm not in aspect_deltas:
+                    aspect_deltas[norm] = sentiment * 0.3 * confidence
+
+            for aspect, delta in aspect_deltas.items():
+                profile.tag_affinity[aspect] = _clamp(profile.tag_affinity.get(aspect, 0.0) + delta)
+
             dir_sent = llm_res.get("director_sentiment")
             if dir_sent is not None:
-                for director in movie_card.get("directors", []):
-                    profile.director_affinity[director] = profile.director_affinity.get(director, 0.0) + (dir_sent * profile.director_weight * confidence)
+                seen = set()
+                for d in (movie_card.get("directors") or []):
+                    nd = _normalize_aspect(d)
+                    if nd and nd not in seen:
+                        seen.add(nd)
+                        profile.director_affinity[d] = _clamp(
+                            profile.director_affinity.get(d, 0.0) + (dir_sent * profile.director_weight * confidence)
+                        )
 
-            # Actor sentiment updates
-            for actor in llm_res.get("standout_actors", []):
-                profile.actor_affinity[actor] = profile.actor_affinity.get(actor, 0.0) + (sentiment_score * profile.actor_weight * confidence)
+            seen_actors = set()
+            for actor in (llm_res.get("standout_actors") or []):
+                na = _normalize_aspect(actor)
+                if na and na not in seen_actors:
+                    seen_actors.add(na)
+                    profile.actor_affinity[actor] = _clamp(
+                        profile.actor_affinity.get(actor, 0.0) + (sentiment * profile.actor_weight * confidence)
+                    )
 
-            logger.info(f"LLM review processing completed in {latency_ms}ms for user='{profile.user_id}'.")
             return {
                 "mode": "gemini_llm",
                 "latency_ms": latency_ms,
@@ -239,30 +242,5 @@ class LLMReviewProcessor:
             }
 
         except Exception as e:
-            logger.warning(f"LLM Review Processing failed ({e}). Falling back to local Path B processor.")
+            logger.warning(f"LLM review processing failed ({e}). Falling back to local.")
             return self.fallback.process_review(profile, movie_card, star_rating, review_text, surgical_aspects)
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    processor = LLMReviewProcessor()
-    user = UserProfile(user_id="test_reviewer")
-    movie = {
-        "movie_id": 58559,
-        "title": "The Dark Knight",
-        "genres": ["Action", "Crime", "Drama"],
-        "directors": ["Christopher Nolan"],
-        "actors": ["Christian Bale", "Heath Ledger"]
-    }
-
-    result = processor.process_review(
-        profile=user,
-        movie_card=movie,
-        star_rating=5.0,
-        review_text="Brilliant cinematography and incredible acting by Heath Ledger, but a bit long.",
-        surgical_aspects=["Visuals", "Performances"]
-    )
-
-    print("\nReview Processing Result Mode:", result.get("mode"))
-    print("User Tag Affinities:", user.tag_affinity)
-    print("User Director Affinities:", user.director_affinity)
