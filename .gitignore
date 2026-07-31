@@ -16,11 +16,9 @@ db/
 *.sqlite3
 *.duckdb
 
-# ── dirtywork/ ────────────────────────────────────────────────────────────────
-# Contains: raw JSONL profile cards, binary index artifacts, one-off build
-# scripts, scrapers, raw datasets, archives, and exploration notebooks.
-# Nothing in dirtywork/ belongs in source control.
+# ── dirtywork/ & scripts/ ───────────────────────────────────────────────────
 dirtywork/
+scripts/
 
 # Large binary / generated index artifacts (if ever outside dirtywork/)
 *.hnsw
