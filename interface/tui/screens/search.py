@@ -64,7 +64,9 @@ class SearchScreen(Screen):
         self.run_search(initial_load=True)
 
     def action_focus_search(self) -> None:
-        self.query_one("#query-input", Input).focus()
+        inp = self.query_one("#query-input", Input)
+        inp.value = ""
+        inp.focus()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-search":
@@ -124,16 +126,23 @@ class SearchScreen(Screen):
 
             table.add_row(final_rank, title, rating, genres, score, key=str(item.get("movie_id", idx)))
 
+        if results and not initial_load:
+            table.focus()
+
     def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
         self.action_inspect_selected()
 
     def action_inspect_selected(self) -> None:
+        if self.query_one("#query-input", Input).has_focus:
+            return
         selected_item = self.get_selected_movie_item()
         if selected_item:
             from interface.tui.modals.inspector import MovieInspectorModal
             self.app.push_screen(MovieInspectorModal(selected_item))
 
     def action_review_selected(self) -> None:
+        if self.query_one("#query-input", Input).has_focus:
+            return
         selected_item = self.get_selected_movie_item()
         if selected_item:
             from interface.tui.modals.review import ReviewSubmissionModal
