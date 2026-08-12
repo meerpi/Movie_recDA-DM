@@ -2,7 +2,6 @@
 interface/tui/modals/preferences.py — User Profile Preferences & Data Controls Modal Screen
 """
 
-from typing import List
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
@@ -10,10 +9,6 @@ from textual.widgets import Button, Checkbox, Input, Label, Rule, Static
 
 
 class ProfilePreferencesModal(ModalScreen[None]):
-    """
-    Modal for viewing and editing User Profile preferences, dealbreakers, sensitivity weights,
-    and implicit data collection controls.
-    """
 
     BINDINGS = [
         ("escape", "dismiss", "Close"),
@@ -57,8 +52,8 @@ class ProfilePreferencesModal(ModalScreen[None]):
                 id="pref-scroll-body"
             ),
             Horizontal(
-                Button("[ SAVE PREFERENCES ]", id="btn-save-pref", classes="-filled"),
-                Button("[ CLOSE ]", id="btn-close-pref", classes="-ghost"),
+                Button("SAVE PREFERENCES", id="btn-save-pref", classes="-filled"),
+                Button("CLOSE", id="btn-close-pref", classes="-ghost"),
                 id="pref-buttons"
             ),
             id="pref-container"

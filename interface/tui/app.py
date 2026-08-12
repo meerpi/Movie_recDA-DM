@@ -35,10 +35,6 @@ PHOSPHOR_CONSOLE = Theme(
 
 
 class CineVaultApp(App):
-    """
-    Main Textual Application class for CineVault.
-    Wires system controller, reactive TUI screens, and modal overlays.
-    """
 
     TITLE = "CineVault — Neural Movie Search & Recommendation Engine"
     CSS_PATH = "cinevault.tcss"

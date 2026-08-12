@@ -4,7 +4,7 @@ import re
 import sqlite3
 import sys
 from pathlib import Path
-from typing import List, Tuple
+
 
 # safe chars for new user IDs
 _SAFE_USER_ID_RE = re.compile(r'^[A-Za-z0-9_\-]{1,64}$')

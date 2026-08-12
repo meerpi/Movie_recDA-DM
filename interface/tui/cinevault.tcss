@@ -98,18 +98,21 @@ Header {
     margin-left: 1;
     background: $primary;
     color: #06305F;
-    border: none;
+    border: tall $primary;
     text-style: bold;
 }
 
 #btn-search:hover {
     background: $primary;
     color: #06305F;
+    border: tall $primary;
 }
 
 #btn-search:focus {
-    background: $primary;
+    background: $foreground;
     color: #06305F;
+    border: tall $foreground;
+    text-style: bold;
 }
 
 /* ── STATUS BAR ──────────────────────────────────────────────── */
@@ -166,18 +169,13 @@ DataTable > .datatable--hover {
 
 #inspector-container {
     width: 92;
-    height: 36;
+    height: 85%;
     background: $panel;
     border: round $foreground-muted;
+    border-title-color: $foreground;
+    border-title-style: bold;
     padding: 1 2;
-}
-
-#inspector-title {
-    color: $foreground;
-    text-style: bold;
-    text-align: left;
-    height: 1;
-    margin-bottom: 1;
+    hatch: "·" $foreground-muted 4%;
 }
 
 #inspector-content {
@@ -185,10 +183,12 @@ DataTable > .datatable--hover {
 }
 
 #inspector-poster-box {
-    width: 30;
-    height: 100%;
+    width: 38;
+    height: 1fr;
     margin-right: 2;
-    background: $panel;
+    background: $surface;
+    border: round $foreground-muted 30%;
+    overflow: hidden;
 }
 
 #inspector-text-box {
@@ -198,31 +198,28 @@ DataTable > .datatable--hover {
 
 #inspector-body {
     height: 1fr;
-    margin-bottom: 1;
+    margin-bottom: 0;
     background: $panel;
+    background-tint: $primary 6%;
 }
 
 #inspector-buttons {
-    height: 3;
-    align: center middle;
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
 }
 
 /* ── REVIEW MODAL ────────────────────────────────────────────── */
 
 #review-container {
     width: 84;
-    height: 36;
+    height: 85%;
     background: $panel;
     border: round $foreground-muted;
+    border-title-color: $foreground;
+    border-title-style: bold;
     padding: 1 2;
-}
-
-#review-title {
-    color: $foreground;
-    text-style: bold;
-    text-align: left;
-    height: 1;
-    margin-bottom: 1;
 }
 
 #review-scroll-body {
@@ -239,8 +236,10 @@ DataTable > .datatable--hover {
 }
 
 #review-buttons {
-    height: 3;
-    align: center middle;
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
 }
 
 /* Aspect chip buttons */
@@ -304,9 +303,11 @@ RadioButton.-on {
 
 #onboard-container {
     width: 84;
-    height: 30;
+    height: 85%;
     background: $panel;
     border: round $foreground-muted;
+    border-title-color: $foreground;
+    border-title-style: bold;
     padding: 1 2;
 }
 
@@ -325,8 +326,10 @@ RadioButton.-on {
 }
 
 #onboard-buttons {
-    height: 3;
-    align: center middle;
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
 }
 
 Checkbox {
@@ -433,17 +436,21 @@ Checkbox.-on {
 }
 
 #profile-buttons {
-    height: 3;
-    align: center middle;
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
 }
 
 /* ── PREFERENCES MODAL (legacy, kept for compat) ─────────────── */
 
 #pref-container {
     width: 84;
-    height: 36;
+    height: 85%;
     background: $panel;
     border: round $foreground-muted;
+    border-title-color: $foreground;
+    border-title-style: bold;
     padding: 1 2;
 }
 
@@ -454,8 +461,10 @@ Checkbox.-on {
 }
 
 #pref-buttons {
-    height: 3;
-    align: center middle;
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
 }
 
 /* ── RULE WIDGET ─────────────────────────────────────────────── */
@@ -475,26 +484,58 @@ Label {
 }
 
 /* ── BUTTONS — THREE-TIER EMPHASIS ───────────────────────────── */
+/*   Spec: cinevault_design_audit.md §3 Button-Emphasis System    */
 
 Button {
     margin: 0 1;
     text-style: bold;
-    border: none;
+    border: tall transparent;
 }
 
-/* Filled (primary action) */
+/* ── Filled (primary / affirmative action) ──────────────────── */
 Button.-filled {
     background: $primary;
     color: #06305F;
-    border: none;
+    border: tall $primary;
 }
 
 Button.-filled:hover {
     background: $primary;
     color: #06305F;
+    border: tall $primary;
 }
 
-/* Outlined (secondary action) */
+Button.-filled:focus {
+    background: $foreground;
+    color: #06305F;
+    border: tall $foreground;
+    text-style: bold;
+}
+
+/* ── Ghost / text (dismissive / secondary action) ───────────── */
+/*   Has a thin border so it reads as a clickable target,        */
+/*   not as inert metadata text. Audit §3: secondary tier.       */
+Button.-ghost {
+    background: transparent;
+    color: $foreground;
+    border: tall $foreground-muted;
+    text-style: none;
+}
+
+Button.-ghost:hover {
+    background: $surface;
+    color: $foreground;
+    border: tall $foreground;
+}
+
+Button.-ghost:focus {
+    background: transparent;
+    color: $primary;
+    border: tall $primary;
+    text-style: bold;
+}
+
+/* ── Outlined (explicit secondary, stronger than ghost) ─────── */
 Button.-outlined {
     background: transparent;
     color: $primary;
@@ -507,19 +548,14 @@ Button.-outlined:hover {
     border: tall $primary;
 }
 
-/* Ghost / text (low-emphasis) */
-Button.-ghost {
-    background: transparent;
-    color: $foreground-muted;
-    border: none;
-}
-
-Button.-ghost:hover {
-    background: $surface;
+Button.-outlined:focus {
+    background: $primary-muted;
     color: $foreground;
+    border: tall $foreground;
+    text-style: bold;
 }
 
-/* Destructive (error role — genuinely destructive actions only) */
+/* ── Destructive (error role) ───────────────────────────────── */
 Button.-destructive {
     background: transparent;
     color: $error;
@@ -532,27 +568,59 @@ Button.-destructive:hover {
     border: tall $error;
 }
 
-/* Legacy Textual variants — map to new tiers */
+Button.-destructive:focus {
+    background: $error;
+    color: #2A0605;
+    border: tall $foreground;
+    text-style: bold;
+}
+
+/* ── Disabled (any tier — not yet activatable) ──────────────── */
+Button:disabled {
+    background: transparent;
+    color: $foreground-muted;
+    border: none;
+    text-style: dim;
+    opacity: 0.5;
+}
+
+/* ── Legacy Textual variants — map to new tiers ─────────────── */
 Button.-success {
     background: $primary;
     color: #06305F;
-    border: none;
+    border: tall $primary;
 }
 
 Button.-success:hover {
     background: $primary;
     color: #06305F;
+    border: tall $primary;
+}
+
+Button.-success:focus {
+    background: $foreground;
+    color: #06305F;
+    border: tall $foreground;
+    text-style: bold;
 }
 
 Button.-error {
     background: transparent;
-    color: $foreground-muted;
-    border: none;
+    color: $foreground;
+    border: tall $foreground-muted;
+    text-style: none;
 }
 
 Button.-error:hover {
     background: $surface;
     color: $foreground;
+}
+
+Button.-error:focus {
+    background: transparent;
+    color: $primary;
+    border: tall $primary;
+    text-style: bold;
 }
 
 Button.-primary {
@@ -566,15 +634,30 @@ Button.-primary:hover {
     color: $primary;
 }
 
+Button.-primary:focus {
+    background: $primary-muted;
+    color: $foreground;
+    border: tall $foreground;
+    text-style: bold;
+}
+
 Button.-default {
     background: transparent;
-    color: $foreground-muted;
-    border: none;
+    color: $foreground;
+    border: tall $foreground-muted;
+    text-style: none;
 }
 
 Button.-default:hover {
     background: $surface;
     color: $foreground;
+}
+
+Button.-default:focus {
+    background: transparent;
+    color: $primary;
+    border: tall $primary;
+    text-style: bold;
 }
 
 /* ── INPUT — GLOBAL ──────────────────────────────────────────── */
@@ -612,6 +695,23 @@ TextArea:focus {
 Markdown {
     background: $panel;
     color: $foreground;
+}
+
+/* Audit §2: section headings use $fg-bold (white/bold), NOT $primary.
+   Blue is reserved for interactive elements only.                    */
+MarkdownH3 {
+    color: $foreground;
+    text-style: bold;
+    margin: 1 0 0 0;
+}
+
+/* Audit §2: divider rules use $muted gray, not $secondary (yellow).
+   Structural dividers should recede, not attract attention.          */
+MarkdownHorizontalRule {
+    border-bottom: solid $foreground-muted;
+    height: 1;
+    padding-top: 1;
+    margin-bottom: 1;
 }
 
 /* ── SCROLLBAR ───────────────────────────────────────────────── */

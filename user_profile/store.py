@@ -13,7 +13,6 @@ import json
 import logging
 import sqlite3
 from pathlib import Path
-from typing import List
 
 from user_profile.schema import UserProfile
 
@@ -29,7 +28,7 @@ class ProfileConflictError(Exception):
 
 class UserProfileStore:
 
-    def __init__(self, db_path: Path = DB_PATH):
+    def __init__(self, db_path=DB_PATH):
         self.db_path = db_path
         self._init_db()
 

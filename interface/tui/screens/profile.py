@@ -24,9 +24,6 @@ SIGNAL_LABELS = {
 
 
 class ProfileScreen(Screen):
-    """
-    User Profile Screen — Personalization and Memory.
-    """
 
     BINDINGS = [
         ("escape", "app.pop_screen", "Back"),
@@ -62,12 +59,12 @@ class ProfileScreen(Screen):
                             placeholder="Add a new insight (e.g. 'Prefers slow-burn character studies')...",
                             id="memory-add-input",
                         ),
-                        Button("[ ADD ]", id="btn-add-memory", classes="-outlined"),
+                        Button("ADD", id="btn-add-memory", classes="-outlined"),
                         id="memory-add-bar",
                     ),
                     Rule(),
                     Button(
-                        "[ CLEAR ALL MEMORY ]",
+                        "CLEAR ALL MEMORY",
                         id="btn-clear-memory",
                         classes="-destructive",
                     ),
@@ -76,7 +73,7 @@ class ProfileScreen(Screen):
 
                 # Bottom buttons
                 Horizontal(
-                    Button("[ BACK ]", id="btn-back-profile", classes="-ghost"),
+                    Button("BACK", id="btn-back-profile", classes="-ghost"),
                     id="profile-buttons",
                 ),
                 id="profile-container",
@@ -85,7 +82,6 @@ class ProfileScreen(Screen):
         )
 
     def _build_signal_rows(self) -> list:
-        """Build the signal weight rows."""
         controller = getattr(self.app, "controller", None)
         weights = controller.get_signal_weights() if controller else {}
 
@@ -115,7 +111,6 @@ class ProfileScreen(Screen):
         self._refresh_memory_list()
 
     def _refresh_memory_list(self) -> None:
-        """Refresh the memory entries list from the controller."""
         controller = getattr(self.app, "controller", None)
         memory_list = self.query_one("#memory-list", Vertical)
         memory_list.remove_children()

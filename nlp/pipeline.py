@@ -6,7 +6,6 @@ import os
 import re
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
@@ -51,7 +50,7 @@ class CineVaultPipeline:
         self.profile_store = UserProfileStore(db_path=db_path)
 
         self.use_qwen_4bit = use_qwen_4bit
-        self._reranker: Optional[CineVaultReranker] = None
+        self._reranker = None
         if not lazy_load_models:
             self._reranker = CineVaultReranker(use_qwen_4bit=use_qwen_4bit)
 
@@ -65,7 +64,7 @@ class CineVaultPipeline:
 
     def recommend(self, query, user_id="default_user", top_k=10,
                   personalization_lambda=0.7, include_watched=False,
-                  use_qul=True, candidates_k=250, use_voyage=True):
+                  use_qul=True, candidates_k=300, use_voyage=True):
         t0 = time.time()
         query_str = query.strip()
 

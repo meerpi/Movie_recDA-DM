@@ -3,7 +3,6 @@ interface/tui/screens/search.py — Search & Recommendation Screen for CineVault
 """
 
 import asyncio
-from typing import Any, Dict, List, Optional
 from textual.app import ComposeResult
 from textual.containers import Container, Horizontal, Vertical
 from textual.screen import Screen
@@ -11,11 +10,6 @@ from textual.widgets import Button, DataTable, Header, Input, Rule, Static
 
 
 class SearchScreen(Screen):
-    """
-    Search & Recommendation Screen.
-    Contains Header, Title, Search Bar, Status Bar, and Recommendations DataTable.
-    Automatically displays Top 10 Personalized Recommendations on mount.
-    """
 
     BINDINGS = [
         ("ctrl+s", "focus_search", "Focus Search"),
@@ -25,7 +19,7 @@ class SearchScreen(Screen):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.current_results: List[Dict[str, Any]] = []
+        self.current_results = []
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -105,7 +99,7 @@ class SearchScreen(Screen):
 
     def populate_results(
         self,
-        results: List[Dict[str, Any]],
+        results,
         query_text: str,
         elapsed_ms: float,
         initial_load: bool = False
@@ -145,7 +139,7 @@ class SearchScreen(Screen):
             from interface.tui.modals.review import ReviewSubmissionModal
             self.app.push_screen(ReviewSubmissionModal(selected_item))
 
-    def get_selected_movie_item(self) -> Optional[Dict[str, Any]]:
+    def get_selected_movie_item(self):
         table = self.query_one("#results-table", DataTable)
         if table.row_count == 0 or table.cursor_row < 0:
             return None

@@ -29,13 +29,6 @@ ASPECTS = [
 
 
 class ReviewSubmissionModal(ModalScreen[None]):
-    """
-    Conversational three-phase review modal.
-
-    Phase 1: User taps which film aspects they want to rate.
-    Phase 2: For each selected aspect, user picks a 1–5 quality score.
-    Phase 3: View star average, write optional free-text, submit.
-    """
 
     BINDINGS = [
         Binding("escape", "dismiss", "Cancel"),
@@ -55,12 +48,11 @@ class ReviewSubmissionModal(ModalScreen[None]):
 
     def compose(self) -> ComposeResult:
         container = Vertical(
-            Static(f"[ REVIEW ] {self.movie_title.upper()}", id="review-title"),
             Static("", id="review-progress"),
             VerticalScroll(id="review-scroll-body"),
             Horizontal(
-                Button("[ NEXT ]",   id="btn-next",   classes="-filled"),
-                Button("[ CANCEL ]", id="btn-cancel", classes="-ghost"),
+                Button("NEXT",   id="btn-next",   classes="-filled"),
+                Button("CANCEL", id="btn-cancel", classes="-ghost"),
                 id="review-buttons",
             ),
             id="review-container",
@@ -68,10 +60,11 @@ class ReviewSubmissionModal(ModalScreen[None]):
         yield Container(container, id="modal-wrapper")
 
     def on_mount(self) -> None:
+        container = self.query_one("#review-container")
+        container.border_title = f"[ REVIEW ] {self.movie_title.upper()}"
         self._render_phase_1()
 
     def _update_progress(self) -> None:
-        """Update the progress indicator: ● ○ ○ style."""
         progress = self.query_one("#review-progress", Static)
         dots = []
         for i in range(1, 4):
@@ -91,7 +84,7 @@ class ReviewSubmissionModal(ModalScreen[None]):
             scroll.mount(Button(f"  {label}", id=f"aspect-{key}", classes="aspect-chip"))
         self._phase = 1
         self._update_progress()
-        self.query_one("#btn-next", Button).label = "[ NEXT ]"
+        self.query_one("#btn-next", Button).label = "NEXT"
 
     def _render_phase_2(self) -> None:
         key = self._scoring_queue[self._scoring_index]
@@ -114,9 +107,7 @@ class ReviewSubmissionModal(ModalScreen[None]):
         )
         self._phase = 2
         self._update_progress()
-        self.query_one("#btn-next", Button).label = (
-            "[ NEXT ]" if current < total else "[ NEXT ]"
-        )
+        self.query_one("#btn-next", Button).label = "NEXT"
 
     def _render_phase_3(self) -> None:
         scroll = self.query_one("#review-scroll-body", VerticalScroll)
@@ -136,9 +127,9 @@ class ReviewSubmissionModal(ModalScreen[None]):
         self._update_progress()
         # Submit is the filled primary action; Back is ghost
         btn_next = self.query_one("#btn-next", Button)
-        btn_next.label = "[ SUBMIT ]"
+        btn_next.label = "SUBMIT"
         btn_cancel = self.query_one("#btn-cancel", Button)
-        btn_cancel.label = "[ BACK ]"
+        btn_cancel.label = "BACK"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         bid = event.button.id
@@ -150,10 +141,10 @@ class ReviewSubmissionModal(ModalScreen[None]):
                     self._scoring_index = len(self._scoring_queue) - 1
                     self._render_phase_2()
                     # Restore cancel label
-                    self.query_one("#btn-cancel", Button).label = "[ CANCEL ]"
+                    self.query_one("#btn-cancel", Button).label = "CANCEL"
                 else:
                     self._render_phase_1()
-                    self.query_one("#btn-cancel", Button).label = "[ CANCEL ]"
+                    self.query_one("#btn-cancel", Button).label = "CANCEL"
             else:
                 self.dismiss()
             return

@@ -7,7 +7,6 @@ import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
 
 from nlp.pipeline import CineVaultPipeline
 from user_profile.review_processor import LLMReviewProcessor
@@ -28,12 +27,12 @@ class CineVaultController:
 
         self.lambda_personalization = 0.7
         self.exclude_watched = True
-        self.active_search_results: List[Dict[str, Any]] = []
+        self.active_search_results = []
         self.active_inspected_movie = None
-        self._query_cache: dict = {}
+        self._query_cache = {}
 
-        self.pipeline: Optional[CineVaultPipeline] = None
-        self.review_processor: Optional[LLMReviewProcessor] = None
+        self.pipeline = None
+        self.review_processor = None
 
         if not self.store.user_exists(self.user_id):
             self.store.save_profile(self.profile)

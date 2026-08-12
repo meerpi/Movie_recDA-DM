@@ -11,7 +11,7 @@ import numpy as np
 _CLAMP = (-3.0, 3.0)
 
 
-def _clamp(val: float) -> float:
+def _clamp(val):
     return max(_CLAMP[0], min(_CLAMP[1], val))
 
 
@@ -103,10 +103,11 @@ class UserProfile:
     # optimistic locking token — set by store.load_profile()
     _db_version: int = field(default=0, init=False, repr=False)
 
-    # --- scoring ---
+    # ── scoring ──
 
     @staticmethod
-    def _extract_cast(movie_item: Dict[str, Any]) -> List[str]:
+    def _extract_cast(movie_item):
+        """Merges 'actors' + 'cast' fields, deduped, order-preserved."""
         raw_actors = movie_item.get("actors")
         raw_cast = movie_item.get("cast")
         actors_list = raw_actors if isinstance(raw_actors, list) else []
@@ -120,50 +121,35 @@ class UserProfile:
                 combined.append(item)
         return combined
 
-    @staticmethod
-    def _extract_content_terms(movie_item: Dict[str, Any]) -> Set[str]:
-        terms = set()
-        for g in (movie_item.get("genres") or []):
-            if isinstance(g, str) and g.strip():
-                terms.add(g.strip().lower())
-        for t in (movie_item.get("tone") or []):
-            if isinstance(t, str) and t.strip():
-                terms.add(t.strip().lower())
-        for th in (movie_item.get("themes") or []):
-            if isinstance(th, str) and th.strip():
-                terms.add(th.strip().lower())
-        for tag_item in (movie_item.get("top_tags") or []):
-            tag_name = tag_item if isinstance(tag_item, str) else (tag_item.get("tag", "") if isinstance(tag_item, dict) else "")
-            if isinstance(tag_name, str) and tag_name.strip():
-                terms.add(tag_name.strip().lower())
-        pacing = movie_item.get("pacing")
-        if isinstance(pacing, str) and pacing.strip():
-            terms.add(pacing.strip().lower())
-        return terms
-
-    @staticmethod
-    def _is_dealbreaker_match(dealbreaker: str, content_terms: Set[str]) -> bool:
-        db_clean = dealbreaker.strip().lower()
-        if not db_clean or not content_terms:
-            return False
-        if db_clean in content_terms:
-            return True
-        pattern = r"\b" + re.escape(db_clean) + r"\b"
-        return any(bool(re.search(pattern, term)) for term in content_terms)
-
-    def calculate_profile_boost(self, movie_item: Dict[str, Any]) -> float:
-        """Personalized boost for a candidate. Returns -10.0 for hard vetoes
-        (watched / dealbreaker), otherwise sums weighted affinity across all
-        signal dimensions. Confidence-gated for actor/director."""
+    def calculate_profile_boost(self, movie_item):
+        """Personalized boost: -10.0 for hard vetoes (watched/dealbreaker), else sum of weighted affinities, confidence-gated for actor/director."""
         mid = movie_item.get("movie_id")
 
         if mid in self.watch_history:
             return -10.0
 
+        # dealbreaker veto: collect all content terms, then word-boundary match
         if self.dealbreakers:
-            content_terms = self._extract_content_terms(movie_item)
+            content_terms = set()
+            for fname in ("genres", "tone", "themes"):
+                for v in (movie_item.get(fname) or []):
+                    if isinstance(v, str) and v.strip():
+                        content_terms.add(v.strip().lower())
+            for tag_item in (movie_item.get("top_tags") or []):
+                tag_name = tag_item if isinstance(tag_item, str) else (tag_item.get("tag", "") if isinstance(tag_item, dict) else "")
+                if isinstance(tag_name, str) and tag_name.strip():
+                    content_terms.add(tag_name.strip().lower())
+            pacing = movie_item.get("pacing")
+            if isinstance(pacing, str) and pacing.strip():
+                content_terms.add(pacing.strip().lower())
+
             for db in self.dealbreakers:
-                if self._is_dealbreaker_match(db, content_terms):
+                db_clean = db.strip().lower()
+                if not db_clean:
+                    continue
+                if db_clean in content_terms or any(
+                    re.search(r"\b" + re.escape(db_clean) + r"\b", term) for term in content_terms
+                ):
                     return -10.0
 
         score = 0.0
@@ -226,11 +212,10 @@ class UserProfile:
     def _confidence_gate(self, count):
         return 1.0 if count >= 3 else 0.5
 
-    # --- profile updates ---
+    # ── profile updates ──
 
     def apply_rating_update(self, movie_item, star_rating, review_confidence=1.0):
-        """Updates all affinity signals after a rating. Weight is normalized
-        to [-1, +1] via (star - 3) / 2, clamped to [-3, 3]."""
+        """Updates all affinity signals after a rating — weight = (star - 3) / 2, clamped to [-3, 3]."""
         mid = movie_item.get("movie_id")
         title = movie_item.get("title", f"Movie #{mid}")
 
@@ -316,10 +301,10 @@ class UserProfile:
         genre_spread = len(self.genre_affinity)
         self.exploration_rate = min(1.0, genre_spread / max(1, total * 0.3))
 
-    def add_to_watchlist(self, movie_id: int):
+    def add_to_watchlist(self, movie_id):
         self.watchlist.add(movie_id)
 
-    def mark_abandoned(self, movie_id: int):
+    def mark_abandoned(self, movie_id):
         self.abandoned.add(movie_id)
         self.watch_history.add(movie_id)
 
@@ -352,7 +337,7 @@ class UserProfile:
         self.last_session_ts = int(time.time())
 
     @staticmethod
-    def get_era_from_year(year: int) -> str:
+    def get_era_from_year(year):
         decade = (year // 10) * 10
         return f"{decade}s"
 
@@ -368,9 +353,9 @@ class UserProfile:
     def get_top_directors(self, n=5):
         return sorted(self.director_affinity, key=self.director_affinity.get, reverse=True)[:n]
 
-    # --- serialization ---
+    # ── serialization ──
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self):
         return {
             "user_id": self.user_id,
             "personalization_lambda": self.personalization_lambda,
@@ -424,7 +409,7 @@ class UserProfile:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "UserProfile":
+    def from_dict(cls, data):
         """All new fields use safe defaults — backward-compatible with v1 profiles."""
         return cls(
             user_id=data.get("user_id", "default_user"),

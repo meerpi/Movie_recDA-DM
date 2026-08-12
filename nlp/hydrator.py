@@ -60,7 +60,8 @@ class ResultHydrator:
             cursor.execute(f"""
                 SELECT m.movie_id, m.title, m.year,
                        GROUP_CONCAT(DISTINCT g.name) as genres,
-                       ms.avg_rating, ms.num_ratings, ms.pct_positive, ms.popularity_rank
+                       ms.avg_rating, ms.num_ratings, ms.pct_positive, ms.popularity_rank,
+                       m.overview, m.wiki_intro, m.wiki_plot
                 FROM movies m
                 LEFT JOIN movie_genres mg ON m.movie_id = mg.movie_id
                 LEFT JOIN genres g ON mg.genre_id = g.genre_id
@@ -69,7 +70,7 @@ class ResultHydrator:
                 GROUP BY m.movie_id
             """, mids)
             for row in cursor.fetchall():
-                mid, title, year, genres, avg_rating, num_ratings, pct_pos, pop_rank = row
+                mid, title, year, genres, avg_rating, num_ratings, pct_pos, pop_rank, overview, wiki_intro, wiki_plot = row
                 db_info[mid] = {
                     "title":           title,
                     "year":            year,
@@ -78,6 +79,9 @@ class ResultHydrator:
                     "num_ratings":     num_ratings or 0,
                     "pct_positive":    pct_pos if (num_ratings and num_ratings > 0) else 0.0,
                     "popularity_rank": pop_rank or 999999,
+                    "overview":        overview,
+                    "wiki_intro":      wiki_intro,
+                    "wiki_plot":       wiki_plot,
                 }
             conn.close()
 
@@ -117,6 +121,9 @@ class ResultHydrator:
                 "poster_path":         card.get("poster_path"),
                 "backdrop_path":       card.get("backdrop_path"),
                 "tagline":             card.get("tagline") or "",
+                "overview":            card.get("overview") or db.get("overview"),
+                "wiki_intro":          card.get("wiki_intro") or db.get("wiki_intro"),
+                "wiki_plot":           card.get("wiki_plot") or db.get("wiki_plot"),
             }
 
             if "themes" in card:

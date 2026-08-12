@@ -9,7 +9,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+
 
 from user_profile.schema import UserProfile, _clamp
 
@@ -97,7 +97,7 @@ class NonLLMReviewProcessor:
 
         profile.apply_rating_update(movie_card, star_rating=star_rating, review_confidence=text_confidence)
 
-        aspect_deltas: Dict[str, float] = {}
+        aspect_deltas = {}
 
         if surgical_aspects:
             mult = (star_rating - 3.0) / 2.0
@@ -187,7 +187,7 @@ class LLMReviewProcessor:
 
             profile.apply_rating_update(movie_card, star_rating=star_rating, review_confidence=confidence)
 
-            aspect_deltas: Dict[str, float] = {}
+            aspect_deltas = {}
 
             if surgical_aspects:
                 for aspect in surgical_aspects:

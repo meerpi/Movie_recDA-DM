@@ -5,6 +5,7 @@ interface/tui/modals/inspector.py — Movie Inspector Modal with TMDB Poster
 import asyncio
 import hashlib
 import logging
+import os
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -20,16 +21,20 @@ logger = logging.getLogger("cinevault.inspector")
 _CACHE_DIR = Path(__file__).parent.parent.parent.parent / ".tmp" / "poster_cache"
 
 TMDB_BASE = "https://image.tmdb.org/t/p"
-POSTER_SIZE = "w342"
+POSTER_SIZE = "w500"
+
+# Rendering protocol for textual-image: "auto" (default), "tgp", "sixel", or "halfcell".
+# Override via CINEVAULT_IMAGE_RENDERING env var for terminals with known Sixel/TGP support.
+_IMAGE_RENDERING = os.environ.get("CINEVAULT_IMAGE_RENDERING", "auto").lower()
 
 
-def _poster_cache_path(poster_path: str) -> Path:
-    """Returns local cache file path for a poster_path."""
-    safe = hashlib.md5(poster_path.encode()).hexdigest()
+def _poster_cache_path(poster_path):
+    """Returns local cache file path for a poster_path (keyed by size to avoid stale hits)."""
+    safe = hashlib.md5(f"{POSTER_SIZE}:{poster_path}".encode()).hexdigest()
     return _CACHE_DIR / f"{safe}.jpg"
 
 
-async def _fetch_poster(poster_path: str) -> Optional[Path]:
+async def _fetch_poster(poster_path):
     """Downloads a poster to local cache if not already present. Returns the local path."""
     if not poster_path:
         return None
@@ -57,10 +62,6 @@ async def _fetch_poster(poster_path: str) -> Optional[Path]:
 
 
 class MovieInspectorModal(ModalScreen[None]):
-    """
-    Movie Inspector Modal.
-    Displays poster (left) + metadata markdown (right).
-    """
 
     BINDINGS = [
         ("escape", "dismiss", "Close Modal"),
@@ -72,14 +73,7 @@ class MovieInspectorModal(ModalScreen[None]):
         self.item = item
 
     def compose(self) -> ComposeResult:
-        title = self.item.get("title", "Unknown Movie")
-        year = self.item.get("year", "")
-        year_str = f" ({year})" if year else ""
-
         container = Vertical(
-            # Title as text inside the modal, not in the border
-            Static(f"[ INSPECTOR ] {title.upper()}{year_str}", id="inspector-title"),
-
             # Content area: poster left, text right
             Horizontal(
                 Vertical(
@@ -95,8 +89,8 @@ class MovieInspectorModal(ModalScreen[None]):
 
             # Action buttons
             Horizontal(
-                Button("[ WRITE REVIEW ]", id="btn-inspector-review", classes="-filled"),
-                Button("[ CLOSE ]", id="btn-inspector-close", classes="-ghost"),
+                Button("WRITE REVIEW", id="btn-inspector-review", classes="-filled"),
+                Button("CLOSE", id="btn-inspector-close", classes="-ghost"),
                 id="inspector-buttons",
             ),
             id="inspector-container",
@@ -105,7 +99,12 @@ class MovieInspectorModal(ModalScreen[None]):
         yield Container(container, id="modal-wrapper")
 
     def on_mount(self) -> None:
-        """Load poster asynchronously after mount."""
+        title = self.item.get("title", "Unknown Movie")
+        year = self.item.get("year", "")
+        year_str = f" ({year})" if year else ""
+        container = self.query_one("#inspector-container")
+        container.border_title = f"[ INSPECTOR ] {title.upper()}{year_str}"
+
         poster_path = self.item.get("poster_path")
         if poster_path:
             self.run_worker(self._load_poster(poster_path))
@@ -113,17 +112,33 @@ class MovieInspectorModal(ModalScreen[None]):
             placeholder = self.query_one("#poster-placeholder", Static)
             placeholder.update("No poster available")
 
-    async def _load_poster(self, poster_path: str) -> None:
-        """Fetch and display the poster image."""
+    async def _load_poster(self, poster_path) -> None:
         local_path = await _fetch_poster(poster_path)
         placeholder = self.query_one("#poster-placeholder", Static)
 
         if local_path and local_path.exists():
             try:
-                from textual_image.widget import Image
                 poster_box = self.query_one("#inspector-poster-box", Vertical)
                 await placeholder.remove()
-                poster_widget = Image(str(local_path))
+
+                poster_widget = None
+
+                # Kitty detection: KITTY_WINDOW_ID is always set inside kitty.
+                # Use TGPImage directly — bypasses the flaky escape-probe that
+                # often times out and falls back to blocky halfcell rendering.
+                if os.environ.get("KITTY_WINDOW_ID"):
+                    try:
+                        from textual_image.widget import TGPImage
+                        poster_widget = TGPImage(str(local_path))
+                        logger.info("Using TGPImage (kitty detected via KITTY_WINDOW_ID)")
+                    except Exception as e:
+                        logger.info(f"TGPImage failed, falling back to auto: {e}")
+
+                # Fallback: auto-detected protocol (works for non-kitty terminals)
+                if poster_widget is None:
+                    from textual_image.widget import Image
+                    poster_widget = Image(str(local_path))
+
                 await poster_box.mount(poster_widget)
             except Exception as e:
                 logger.warning(f"Could not render poster widget: {e}")
@@ -146,12 +161,17 @@ class MovieInspectorModal(ModalScreen[None]):
         tone = ", ".join(self.item.get("tone", [])) if self.item.get("tone") else "N/A"
         pacing = self.item.get("pacing") or "N/A"
         comp = ", ".join(self.item.get("comparable_films", [])) if self.item.get("comparable_films") else "N/A"
-        overview = self.item.get("overview") or self.item.get("wiki_intro") or "No plot summary available."
+        overview = self.item.get("overview") or self.item.get("wiki_plot") or self.item.get("wiki_intro") or "No plot summary available."
+        if overview and overview != "No plot summary available.":
+            import re
+            sentences = [s.strip() for s in re.split(r'(?<=[.!?])\s+', overview) if s.strip()]
+            if len(sentences) > 3:
+                overview = " ".join(sentences[:3])
+                if not overview.endswith(('.', '!', '?')):
+                    overview += "..."
 
         content_rating = self.item.get('content_rating', 'NR')
-        return f"""# {title}{year_str}
-
-{rating}  |  {tier}  |  {content_rating}
+        return f"""{rating}  |  {tier}  |  {content_rating}
 
 ---
 

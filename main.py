@@ -16,6 +16,39 @@ os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 warnings.filterwarnings("ignore", category=UserWarning, module="huggingface_hub")
 
+
+def _fix_cell_size_for_fractional_scaling():
+    """Compensate for Wayland fractional scaling (e.g. Hyprland 1.5×).
+
+    textual-image uses int() truncation for cell-size detection from TIOCGWINSZ,
+    which produces wrong values at non-integer scale factors. We pre-seed the
+    TEXTUAL_CELL_WIDTH/HEIGHT env vars with round() values so textual-image's
+    fallback path picks them up before caching a bad result.
+    """
+    import struct, fcntl, termios
+    try:
+        if not sys.__stdout__ or not sys.__stdout__.isatty():
+            return
+        buf = fcntl.ioctl(sys.__stdout__, termios.TIOCGWINSZ, b'\x00' * 8)
+        rows, cols, xpix, ypix = struct.unpack('HHHH', buf)
+        if rows > 0 and cols > 0 and xpix > 0 and ypix > 0:
+            cell_w = round(xpix / cols)
+            cell_h = round(ypix / rows)
+            os.environ.setdefault("TEXTUAL_CELL_WIDTH", str(cell_w))
+            os.environ.setdefault("TEXTUAL_CELL_HEIGHT", str(cell_h))
+    except Exception:
+        pass  # Not a TTY or ioctl failed — skip
+
+    # Clear any cached cell size so textual-image re-reads from env vars
+    try:
+        from textual_image._terminal import get_cell_size
+        if hasattr(get_cell_size, "_result"):
+            delattr(get_cell_size, "_result")
+    except Exception:
+        pass
+
+_fix_cell_size_for_fractional_scaling()
+
 PROJECT_ROOT = Path(__file__).parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))

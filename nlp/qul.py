@@ -8,7 +8,7 @@ import re
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Set
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,20 +16,20 @@ logger = logging.getLogger("cinevault.qul")
 
 
 class DemonymMatch(BaseModel):
-    demonym: str = Field(description="Nationality/origin adjective as used in the query, e.g. 'korean'")
-    lang: str = Field(description="ISO 639-1 language code, e.g. 'ko'")
-    country: str = Field(description="Lowercase country name, e.g. 'south korea'")
+    demonym: str
+    lang: str = Field(description="ISO 639-1 code")
+    country: str = Field(description="lowercase country name")
 
 
 class QULResult(BaseModel):
-    expanded_query: str = Field(description="Descriptive prose for a dense embedding model — not a keyword dump.")
-    bm25_keywords: list[str] = Field(description="3-10 concrete lexical terms (titles, names, specific nouns) for BM25 — must not just repeat expanded_query.")
-    matched_genres: list[str] = Field(description="Genres from the valid list the query clearly asks for.")
+    expanded_query: str = Field(description="Descriptive prose for embedding, not a keyword dump.")
+    bm25_keywords: list[str] = Field(description="3-10 concrete lexical terms for BM25.")
+    matched_genres: list[str] = Field(default_factory=list)
     genre_strictness: Literal["hard_exclude", "soft_preference", "unspecified"]
-    is_obscure_intent: bool = Field(description="True only for explicit obscure/cult/indie/hidden-gem/rare/underrated/B-movie signals.")
-    negated_constraints: list[str] = Field(description="Things explicitly excluded — not things merely unmentioned.")
-    detected_title: Optional[str] = Field(description="Only if the query references it via 'like/similar to/if I liked X'. Never inferred from vibes.")
-    detected_demonym: Optional[DemonymMatch] = Field(description="Only if the query names a national/cultural origin. Null otherwise — never guessed.")
+    is_obscure_intent: bool = Field(description="True only for explicit obscure/cult/indie/hidden-gem signals.")
+    negated_constraints: list[str] = Field(description="Explicitly excluded, not merely unmentioned.")
+    detected_title: Optional[str] = Field(description="Only if query says 'like/similar to X'. Never inferred.")
+    detected_demonym: Optional[DemonymMatch] = Field(description="Only if query names a national origin. Never guessed.")
     intent_type: Literal["title_reference", "general_search"]
 
 
@@ -103,20 +103,19 @@ except (FileNotFoundError, json.JSONDecodeError):
 
 
 class QueryUnderstandingLayer:
-    """Accepts optional shared_cards from ResultHydrator to skip re-loading
-    the ~185MB JSONL files."""
+    """LLM + local-rules query understanding.  Accepts shared_cards to skip re-loading ~185MB JSONL."""
 
     def __init__(self, db_path=DB_PATH, shared_cards=None):
         t0 = time.time()
         logger.info("Initializing QUL (LLM + Local Rules)...")
         self.db_path = db_path
 
-        self.cards: Dict[int, dict] = {}
-        self.titles_dict: Dict[str, int] = {}
-        self.actor_vocab: Set[str] = set()
-        self.director_vocab: Set[str] = set()
-        self.tag_vocab: Set[str] = set()
-        self.genres_vocab: Set[str] = {
+        self.cards = {}
+        self.titles_dict = {}
+        self.actor_vocab = set()
+        self.director_vocab = set()
+        self.tag_vocab = set()
+        self.genres_vocab = {
             "Action", "Adventure", "Animation", "Children", "Comedy", "Crime",
             "Documentary", "Drama", "Fantasy", "Film-Noir", "Horror", "IMAX",
             "Musical", "Mystery", "Romance", "Sci-Fi", "Thriller", "War", "Western"

@@ -3,7 +3,7 @@
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any, Dict, Optional
+
 
 PROJECT_ROOT = Path(__file__).parent.parent
 DB_PATH = PROJECT_ROOT / "db" / "cinevault.db"

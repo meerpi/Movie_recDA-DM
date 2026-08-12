@@ -33,7 +33,6 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
 
 from user_profile.schema import UserProfile, _clamp
 
@@ -41,32 +40,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DB_PATH = PROJECT_ROOT / "db" / "cinevault.db"
 
 
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
+# ── internal helpers ─────────────────────────────────────────────────────────
 
-def _parse_review_date(review_date: str) -> Optional[int]:
-    """
-    Converts a ``reviews.review_date`` TEXT value to a Unix timestamp (int).
-
-    Supported formats (as written by the ingestion pipeline):
-      - ``'YYYY-MM-DD'``
-      - ``'YYYY-MM-DDTHH:MM:SS'``
-      - ``'YYYY-MM-DD HH:MM:SS'``
-
-    Returns ``None`` if the value is absent or cannot be parsed, so callers can
-    silently drop malformed rows rather than crashing the replay.
-
-    Parameters
-    ----------
-    review_date : str
-        Raw value from the ``reviews.review_date`` column.
-
-    Returns
-    -------
-    int or None
-        Unix timestamp, or None on parse failure.
-    """
+def _parse_review_date(review_date):
+    # Handles YYYY-MM-DD, YYYY-MM-DDTHH:MM:SS, YYYY-MM-DD HH:MM:SS.
+    # Returns None on absent/malformed values so callers can silently skip.
     if not review_date:
         return None
     for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
@@ -79,37 +57,10 @@ def _parse_review_date(review_date: str) -> Optional[int]:
     return None
 
 
-def _fetch_movie_card(conn: sqlite3.Connection, movie_id: int) -> Dict[str, Any]:
-    """
-    Builds a minimal movie card dict for ``UserProfile.apply_rating_update()``.
-
-    Fetches title, year, content_rating, actors, directors, and genres from
-    SQLite.  Fields absent from the DB schema (original_language, tone, pacing,
-    top_tags, production_countries, collection) are omitted from the SELECT;
-    ``original_language`` is defaulted to ``""`` so that the language-affinity
-    update in ``apply_rating_update()`` (guarded by ``if lang:``) silently
-    no-ops — the same pattern already used for all the other absent fields.
-
-    Note: ``original_language`` is not a column in the ``movies`` table of this
-    database.  In the live pipeline it is sourced from the Tier A/B/C profile
-    card JSONL files loaded by ``nlp/hydrator.py``, not from SQLite.
-
-    Actors and directors are stored in the ``movies`` table as either a JSON
-    array string or a comma-separated plain string, depending on the ingestion
-    path; both formats are handled.
-
-    Parameters
-    ----------
-    conn : sqlite3.Connection
-        Open connection to cinevault.db.
-    movie_id : int
-        PK to look up.
-
-    Returns
-    -------
-    dict
-        Minimal movie card ready for ``apply_rating_update()``.
-    """
+def _fetch_movie_card(conn, movie_id):
+    # Builds a minimal card dict for apply_rating_update().
+    # original_language defaults to "" so the lang-affinity guard no-ops
+    # (it's not a column in movies — lives in the Tier A/B/C JSONL files).
     c = conn.cursor()
 
     row = c.execute(
@@ -118,10 +69,7 @@ def _fetch_movie_card(conn: sqlite3.Connection, movie_id: int) -> Dict[str, Any]
         (movie_id,),
     ).fetchone()
 
-    # original_language is not a column in the movies table; it lives in the
-    # Tier A/B/C profile card files loaded by nlp/hydrator.py.  Default to ""
-    # so apply_rating_update()'s "if lang:" guard no-ops cleanly.
-    card: Dict[str, Any] = {"movie_id": movie_id, "original_language": ""}
+    card = {"movie_id": movie_id, "original_language": ""}
     if row:
         card["title"]          = row[0]
         card["year"]           = row[1]
@@ -151,51 +99,10 @@ def _fetch_movie_card(conn: sqlite3.Connection, movie_id: int) -> Dict[str, Any]
     return card
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
+# ── public API ───────────────────────────────────────────────────────────────
 
-def replay_profile(
-    user_id: str,
-    cutoff_ts: int,
-    db_path: Path = DB_PATH,
-) -> UserProfile:
-    """
-    Reconstructs a UserProfile as of a given Unix timestamp.
-
-    All rating events with ``rated_at <= cutoff_ts`` and tag events with
-    ``tagged_at <= cutoff_ts`` are merged into a single chronological stream and
-    replayed in timestamp order.  Events strictly after ``cutoff_ts`` are excluded,
-    making the result exactly the profile the production system would have held at
-    time T.
-
-    Rating events are replayed through ``UserProfile.apply_rating_update()``, which
-    is the identical code path used in production.  This guarantees that genre,
-    tone, tag, pacing, era, language, country, actor, and director affinities, as
-    well as confidence counters and watch-state buckets, are computed the same way
-    the live system computes them — any future refactor of that method is
-    automatically reflected here.
-
-    Tag events from ``user_tags`` are treated as implicit positive signals:
-    the movie is added to ``watch_history`` and the tag string is incremented in
-    ``tag_affinity`` by a fixed delta of +0.3, clamped to [−3.0, 3.0] via
-    ``_clamp()``.
-
-    Parameters
-    ----------
-    user_id : str
-        User to reconstruct.  The ``ratings`` / ``user_tags`` tables store
-        ``user_id`` as INTEGER; this function casts to int before querying.
-    cutoff_ts : int
-        Inclusive upper bound (Unix seconds).
-    db_path : Path
-        Path to cinevault.db.
-
-    Returns
-    -------
-    UserProfile
-        Freshly constructed profile with all signals up to ``cutoff_ts`` applied.
-    """
+def replay_profile(user_id, cutoff_ts, db_path=DB_PATH):
+    """Reconstructs a UserProfile as of cutoff_ts by replaying rating + tag events through apply_rating_update()."""
     profile = UserProfile(user_id=str(user_id))
     conn    = sqlite3.connect(str(db_path))
 
@@ -243,7 +150,7 @@ def replay_profile(
             key=lambda e: (e["ts"], 0 if e["type"] == "rating" else 1),
         )
 
-        _card_cache: Dict[int, Dict[str, Any]] = {}
+        _card_cache = {}
 
         for event in all_events:
             mid = event["movie_id"]
@@ -267,42 +174,8 @@ def replay_profile(
     return profile
 
 
-def time_split_user(
-    user_id: str,
-    n_test: int = 5,
-    db_path: Path = DB_PATH,
-) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-    """
-    Chronological train/test split for a single user.
-
-    Retrieves all rating interactions for ``user_id`` ordered by ``rated_at``
-    ascending.  The most-recent ``n_test`` interactions form the test set;
-    everything earlier forms the train set.
-
-    The cutoff timestamp for ``replay_profile()`` should be set to
-    ``train[-1]["rated_at"]`` (the last train event's timestamp) so that the
-    reconstructed profile contains exactly the training-period signal.
-
-    If the user has fewer than ``n_test + 1`` total interactions the train set
-    will be empty; callers should filter such users before computing metrics to
-    avoid NDCG / Recall being evaluated with no training signal.
-
-    Parameters
-    ----------
-    user_id : str
-        User to split.
-    n_test : int
-        Number of most-recent interactions to hold out.
-    db_path : Path
-        Path to cinevault.db.
-
-    Returns
-    -------
-    train : list of dict
-        Each element has keys: ``user_id``, ``movie_id``, ``rating``, ``rated_at``.
-    test : list of dict
-        Same structure.  Empty list if user has no interactions.
-    """
+def time_split_user(user_id, n_test=5, db_path=DB_PATH):
+    """Chronological train/test split — last n_test interactions are held out."""
     conn = sqlite3.connect(str(db_path))
 
     # C1 fix: user_id is TEXT in the migrated schema.

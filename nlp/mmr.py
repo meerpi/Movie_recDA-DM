@@ -1,7 +1,7 @@
 """nlp/mmr.py — MMR diversity filter with franchise capping."""
 
 import re
-from typing import Any, Dict, List
+
 
 _FRANCHISE_STOPWORDS = {
     "the", "a", "an", "of", "and", "in", "on", "at", "to",

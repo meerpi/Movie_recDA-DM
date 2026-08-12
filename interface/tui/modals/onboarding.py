@@ -27,7 +27,6 @@ class ColdStartOnboardingModal(ModalScreen[None]):
         genre_checkboxes = [Checkbox(g, value=False, id=f"genre-{g.lower()}") for g in self.GENRES]
 
         container = Vertical(
-            Static("[ ONBOARDING ]", id="onboard-title"),
             VerticalScroll(
                 Label("[ STEP 1 ]  Select favorite genres:"),
                 Horizontal(*genre_checkboxes[:4], id="onboard-genres-1"),
@@ -41,8 +40,8 @@ class ColdStartOnboardingModal(ModalScreen[None]):
                 id="onboard-scroll-body"
             ),
             Horizontal(
-                Button("[ SAVE PROFILE ]", id="btn-save-onboard", classes="-filled"),
-                Button("[ CANCEL ]", id="btn-cancel-onboard", classes="-ghost"),
+                Button("SAVE PROFILE", id="btn-save-onboard", classes="-filled"),
+                Button("CANCEL", id="btn-cancel-onboard", classes="-ghost"),
                 id="onboard-buttons"
             ),
             id="onboard-container"
@@ -52,6 +51,10 @@ class ColdStartOnboardingModal(ModalScreen[None]):
             container,
             id="modal-wrapper"
         )
+
+    def on_mount(self) -> None:
+        container = self.query_one("#onboard-container")
+        container.border_title = "[ ONBOARDING ]"
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "btn-cancel-onboard":
