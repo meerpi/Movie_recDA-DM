@@ -123,23 +123,16 @@ class MovieInspectorModal(ModalScreen[None]):
 
                 poster_widget = None
 
-                # Determine rendering mode: explicit override > Kitty detection > auto
-                is_kitty = (
-                    os.environ.get("KITTY_WINDOW_ID")
-                    or "kitty" in os.environ.get("TERM", "")
-                )
-                use_tgp = _IMAGE_RENDERING == "tgp" or (
-                    _IMAGE_RENDERING == "auto" and is_kitty
-                )
-
-                if use_tgp:
+                # Explicit TGP override (e.g. CINEVAULT_IMAGE_RENDERING=tgp)
+                if _IMAGE_RENDERING == "tgp":
                     try:
                         from textual_image.widget import TGPImage
                         poster_widget = TGPImage(str(local_path))
-                        logger.info("Using TGPImage (kitty/tgp detected)")
+                        logger.info("Using TGPImage (forced via CINEVAULT_IMAGE_RENDERING)")
                     except Exception as e:
                         logger.info(f"TGPImage failed, falling back to auto: {e}")
 
+                # Default: auto-detecting Image widget (handles kitty/sixel/halfcell)
                 if poster_widget is None:
                     from textual_image.widget import Image
                     poster_widget = Image(str(local_path))
