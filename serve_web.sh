@@ -19,10 +19,10 @@ export HF_HOME=/home/meerpi/.cache/huggingface
 export HF_HUB_DISABLE_SYMLINKS_WARNING=1
 export TOKENIZERS_PARALLELISM=false
 
-# Pre-seed terminal cell size for textual-image.
-# Over SSH, TIOCGWINSZ returns 0 for pixel dimensions, so the script
-# falls back to querying via escape sequence (\e[14t) while bash still
-# has raw terminal access (before Textual takes over stdin).
-eval "$(python interface/tui/query_cell_size.py 2>/dev/null)" || true
+# Default cell size for textual-image (8x16 works for most terminals:
+# Windows Terminal, CMD, PuTTY, macOS Terminal, Linux VTE-based).
+# Override with actual values if your terminal is unusual.
+export TEXTUAL_CELL_WIDTH=${TEXTUAL_CELL_WIDTH:-8}
+export TEXTUAL_CELL_HEIGHT=${TEXTUAL_CELL_HEIGHT:-16}
 
 exec python main.py
