@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 from nlp.hydrator import ResultHydrator
 from nlp.mmr import MaximalMarginalRelevance
 from nlp.qul import QueryUnderstandingLayer
-from nlp.reranker import CineVaultReranker
 from nlp.retriever import CineVaultRetriever
 from nlp.router import QueryRouter
 from user_profile.schema import UserProfile
@@ -51,14 +50,13 @@ class CineVaultPipeline:
 
         self.use_qwen_4bit = use_qwen_4bit
         self._reranker = None
-        if not lazy_load_models:
-            self._reranker = CineVaultReranker(use_qwen_4bit=use_qwen_4bit)
 
         logger.info(f"Pipeline initialized in {time.time() - t0:.2f}s.")
 
     @property
     def reranker(self):
         if self._reranker is None:
+            from nlp.reranker import CineVaultReranker
             self._reranker = CineVaultReranker(use_qwen_4bit=self.use_qwen_4bit)
         return self._reranker
 
