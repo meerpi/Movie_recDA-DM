@@ -47,17 +47,8 @@ def _fix_cell_size_for_fractional_scaling():
     except Exception:
         pass
 
-_fix_cell_size_for_fractional_scaling()
 
-# Pre-import textual-image to trigger terminal protocol detection (TGP/Sixel)
-# BEFORE Textual starts.  The cell size must already be seeded (above) or
-# available via TEXTUAL_CELL_WIDTH/HEIGHT env vars (set by serve_web.sh for SSH).
-# If this import happens after Textual owns stdin, the escape-sequence probe
-# times out and falls back to blocky halfcell rendering.
-try:
-    import textual_image.widget  # noqa: F401
-except ImportError:
-    pass
+_fix_cell_size_for_fractional_scaling()
 
 PROJECT_ROOT = Path(__file__).parent
 if str(PROJECT_ROOT) not in sys.path:
