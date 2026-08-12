@@ -123,18 +123,23 @@ class MovieInspectorModal(ModalScreen[None]):
 
                 poster_widget = None
 
-                # Kitty detection: KITTY_WINDOW_ID is always set inside kitty.
-                # Use TGPImage directly — bypasses the flaky escape-probe that
-                # often times out and falls back to blocky halfcell rendering.
-                if os.environ.get("KITTY_WINDOW_ID"):
+                # Determine rendering mode: explicit override > Kitty detection > auto
+                is_kitty = (
+                    os.environ.get("KITTY_WINDOW_ID")
+                    or "kitty" in os.environ.get("TERM", "")
+                )
+                use_tgp = _IMAGE_RENDERING == "tgp" or (
+                    _IMAGE_RENDERING == "auto" and is_kitty
+                )
+
+                if use_tgp:
                     try:
                         from textual_image.widget import TGPImage
                         poster_widget = TGPImage(str(local_path))
-                        logger.info("Using TGPImage (kitty detected via KITTY_WINDOW_ID)")
+                        logger.info("Using TGPImage (kitty/tgp detected)")
                     except Exception as e:
                         logger.info(f"TGPImage failed, falling back to auto: {e}")
 
-                # Fallback: auto-detected protocol (works for non-kitty terminals)
                 if poster_widget is None:
                     from textual_image.widget import Image
                     poster_widget = Image(str(local_path))
