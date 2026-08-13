@@ -39,6 +39,13 @@ scripts/
 # Misc tooling
 .DS_Store
 *.log
+my_demo.*
+*.tape
+*.gif
+*.mp4
 
-# Eval runtime artifacts
+# Eval runtime & test scripts
 eval/qul_cache.json
+eval_synthetic_personas.py
+eval_ltr_vs_baseline.py
+

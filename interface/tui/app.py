@@ -38,11 +38,12 @@ class CineVaultApp(App):
 
     TITLE = "CineVault — Neural Movie Search & Recommendation Engine"
     CSS_PATH = "cinevault.tcss"
+    ENABLE_COMMAND_PALETTE = False  # frees ctrl+p for our profile binding
 
     BINDINGS = [
         Binding("ctrl+q", "quit", "Quit App", show=True),
         Binding("ctrl+s", "focus_search", "Focus Search", show=True),
-        Binding("ctrl+o", "open_onboarding", "Onboarding", show=True),
+        Binding("ctrl+o", "open_profile_switcher", "Profiles", show=True),
         Binding("ctrl+p", "open_profile", "Profile", show=True),
     ]
 
@@ -61,9 +62,9 @@ class CineVaultApp(App):
         if isinstance(self.screen, SearchScreen):
             self.screen.action_focus_search()
 
-    def action_open_onboarding(self) -> None:
-        from interface.tui.modals.onboarding import ColdStartOnboardingModal
-        self.push_screen(ColdStartOnboardingModal())
+    def action_open_profile_switcher(self) -> None:
+        from interface.tui.screens.profile_switcher import ProfileSwitcherScreen
+        self.push_screen(ProfileSwitcherScreen())
 
     def action_open_profile(self) -> None:
         from interface.tui.screens.profile import ProfileScreen

@@ -83,10 +83,11 @@ main.py
 | Key | Action |
 |-----|--------|
 | `Ctrl+S` | Focus search input |
-| `Ctrl+O` | Open onboarding wizard |
+| `Ctrl+O` | Profile switcher (switch/create users) |
+| `Ctrl+P` | Profile settings (λ, presets, memory) |
 | `Enter` | Inspect selected movie |
 | `R` | Review selected movie |
-| `Escape` | Close modal |
+| `Escape` | Close modal / go back |
 | `Ctrl+Q` | Quit |
 
 ---
@@ -117,6 +118,14 @@ python nlp/build_dense_hnsw.py       # Build Dense HNSW index
 - **Personalization λ dial** — Exposed in TUI controls bar (0.0 = pure profile, 1.0 = pure query)
 - **Concept Expansions** — `model/concept_expansions.json` — extend without code changes
 - **Profile Card Config** — `model/profile_card_config.json`
+
+---
+
+## 🔮 Future Scope
+
+- **Profile ↔ Scoring Pipeline Wiring** — The profile system (presets, signal toggles, learned taste display) is built as UI + DB but not yet wired into the actual recommendation scoring. The λ slider works (it's passed as `personalization_lambda` to the pipeline), but the per-signal toggles (Watch History / Ratings / Reviews on/off) don't yet gate their respective scoring components. This is the next step.
+- **Preset-driven re-search** — When activating a preset, auto-re-run the current query so results update immediately.
+- **Profile export/import** — JSON export of profiles + presets for backup or sharing.
 
 ---
 

@@ -11,7 +11,7 @@ from pathlib import Path
 from nlp.pipeline import CineVaultPipeline
 from user_profile.review_processor import LLMReviewProcessor
 from user_profile.store import ProfileConflictError, UserProfileStore
-from user_profile.schema import UserProfile
+from user_profile.schema import UserPreset, UserProfile
 
 logger = logging.getLogger("cinevault.controller")
 
@@ -33,6 +33,17 @@ class CineVaultController:
 
         self.pipeline = None
         self.review_processor = None
+
+        # Preset overlay — if one was active, restore it
+        self.active_preset: UserPreset | None = None
+        active = self.store.load_active_preset(self.user_id)
+        if active:
+            self.active_preset = active
+            self.lambda_personalization = active.lambda_val
+            # Apply signal toggles
+            self.profile.disabled_signals = [
+                sig for sig, on in active.signals.items() if not on
+            ]
 
         if not self.store.user_exists(self.user_id):
             self.store.save_profile(self.profile)
@@ -304,7 +315,79 @@ class CineVaultController:
     def switch_user(self, user_id):
         self.user_id = user_id
         self.profile = self.store.load_profile(user_id)
+        self._query_cache.clear()
+        # Load the new user's active preset
+        self.active_preset = self.store.load_active_preset(user_id)
+        if self.active_preset:
+            self.lambda_personalization = self.active_preset.lambda_val
+            self.profile.disabled_signals = [
+                sig for sig, on in self.active_preset.signals.items() if not on
+            ]
+        else:
+            self.lambda_personalization = 0.7
+            self.profile.disabled_signals = []
         return self.profile
+
+    # ── preset management ──
+
+    @property
+    def active_preset_name(self):
+        """Name of the active preset, or 'Default' if none."""
+        return self.active_preset.name if self.active_preset else "Default"
+
+    @property
+    def lambda_label(self):
+        """Human-readable label for the current λ value."""
+        return UserPreset.lambda_to_label(self.lambda_personalization)
+
+    def create_preset(self, name, lambda_val=0.7, signals=None):
+        preset = self.store.create_preset(self.user_id, name, lambda_val, signals)
+        return preset
+
+    def list_presets(self):
+        return self.store.list_presets(self.user_id)
+
+    def activate_preset(self, name):
+        """Activate a named preset — updates λ and signal toggles in-session."""
+        self.store.activate_preset(self.user_id, name)
+        preset = self.store.load_active_preset(self.user_id)
+        if preset:
+            self.active_preset = preset
+            self.lambda_personalization = preset.lambda_val
+            self.profile.disabled_signals = [
+                sig for sig, on in preset.signals.items() if not on
+            ]
+
+    def deactivate_preset(self):
+        """Clear active preset — revert to profile defaults."""
+        self.store.deactivate_preset(self.user_id)
+        self.active_preset = None
+        self.lambda_personalization = 0.7
+        self.profile.disabled_signals = []
+
+    def delete_preset(self, name):
+        was_active = self.active_preset and self.active_preset.name == name
+        self.store.delete_preset(self.user_id, name)
+        if was_active:
+            self.active_preset = None
+            self.lambda_personalization = 0.7
+            self.profile.disabled_signals = []
+
+    def update_preset(self, name, lambda_val, signals):
+        self.store.update_preset(self.user_id, name, lambda_val, signals)
+        # If this preset is currently active, refresh in-session values
+        if self.active_preset and self.active_preset.name == name:
+            self.active_preset.lambda_val = lambda_val
+            self.active_preset.signals = signals
+            self.lambda_personalization = lambda_val
+            self.profile.disabled_signals = [
+                sig for sig, on in signals.items() if not on
+            ]
+
+    def get_user_summaries(self):
+        """Return list of user summary dicts for the profile switcher."""
+        user_ids = self.store.list_users()
+        return [self.store.get_user_summary(uid) for uid in user_ids]
 
     def format_inspector_markdown(self, card):
         title = card.get("title", "Unknown Title")

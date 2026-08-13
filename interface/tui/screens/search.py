@@ -44,6 +44,9 @@ class SearchScreen(Screen):
 
                 # Recommendations DataTable
                 DataTable(id="results-table", cursor_type="row"),
+
+                # Profile Status Chip — shows active user, λ level, and preset
+                Static("", id="status-chip"),
                 id="search-container"
             ),
             id="main-screen-wrapper"
@@ -56,6 +59,16 @@ class SearchScreen(Screen):
         table.add_column("IMDb Rating", key="rating")
         table.add_column("Genres", key="genres")
         table.add_column("Score", key="score")
+
+        # Initialize status chip
+        controller = getattr(self.app, "controller", None)
+        if controller:
+            chip = self.query_one("#status-chip", Static)
+            chip.update(
+                f"{controller.user_id}  │  "
+                f"{controller.lambda_label.capitalize()}  │  "
+                f"{controller.active_preset_name}"
+            )
 
         # Default focus on query input
         self.query_one("#query-input", Input).focus()

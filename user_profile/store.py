@@ -7,6 +7,7 @@ Migrations (applied on first init):
   M4: user_profiles.version column (optimistic concurrency)
   M5: user_profiles_recovery table
   M6: user_profile_snapshots table
+  M7: user_presets table (named λ + signal overlays)
 """
 
 import json
@@ -14,7 +15,7 @@ import logging
 import sqlite3
 from pathlib import Path
 
-from user_profile.schema import UserProfile
+from user_profile.schema import UserPreset, UserProfile
 
 logger = logging.getLogger("cinevault.profile_store")
 
@@ -79,6 +80,20 @@ class UserProfileStore:
             "CREATE INDEX IF NOT EXISTS idx_snapshots_user_ts "
             "ON user_profile_snapshots(user_id, snapshot_ts)"
         )
+
+        # M7 — user_presets table (named λ + signal overlays)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS user_presets (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      TEXT NOT NULL,
+                name         TEXT NOT NULL,
+                lambda       REAL NOT NULL DEFAULT 0.7,
+                signals_json TEXT NOT NULL DEFAULT '{}',
+                is_active    INTEGER NOT NULL DEFAULT 0,
+                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(user_id, name)
+            )
+        """)
 
         conn.commit()
 
@@ -286,3 +301,120 @@ class UserProfileStore:
         ).fetchall()
         conn.close()
         return [r[0] for r in rows]
+
+    def get_user_summary(self, user_id):
+        """Return (user_id, updated_at, num_rated) for the profile switcher display."""
+        conn = sqlite3.connect(str(self.db_path))
+        row = conn.execute(
+            "SELECT profile_json, updated_at FROM user_profiles WHERE user_id = ?",
+            (user_id,),
+        ).fetchone()
+        conn.close()
+        if row is None:
+            return {"user_id": user_id, "updated_at": "N/A", "num_rated": 0}
+        try:
+            data = json.loads(row[0])
+            num_rated = len(data.get("rating_log", []))
+        except Exception:
+            num_rated = 0
+        return {"user_id": user_id, "updated_at": row[1] or "N/A", "num_rated": num_rated}
+
+    # ── preset CRUD ──
+
+    def create_preset(self, user_id, name, lambda_val=0.7, signals=None):
+        """Create a named preset. Returns the UserPreset."""
+        if signals is None:
+            signals = {"watch_history": True, "ratings": True, "reviews": True}
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "INSERT INTO user_presets (user_id, name, lambda, signals_json) "
+            "VALUES (?, ?, ?, ?)",
+            (user_id, name, lambda_val, json.dumps(signals)),
+        )
+        conn.commit()
+        conn.close()
+        return UserPreset(name=name, lambda_val=lambda_val, signals=signals)
+
+    def list_presets(self, user_id):
+        """Return list of UserPreset for the user, with is_active flag."""
+        conn = sqlite3.connect(str(self.db_path))
+        rows = conn.execute(
+            "SELECT name, lambda, signals_json, is_active FROM user_presets "
+            "WHERE user_id = ? ORDER BY created_at",
+            (user_id,),
+        ).fetchall()
+        conn.close()
+        presets = []
+        for name, lam, signals_json, is_active in rows:
+            try:
+                signals = json.loads(signals_json)
+            except Exception:
+                signals = {"watch_history": True, "ratings": True, "reviews": True}
+            presets.append(UserPreset(
+                name=name, lambda_val=lam, signals=signals,
+                is_active=bool(is_active),
+            ))
+        return presets
+
+    def load_active_preset(self, user_id):
+        """Return the active UserPreset, or None if no preset is active."""
+        conn = sqlite3.connect(str(self.db_path))
+        row = conn.execute(
+            "SELECT name, lambda, signals_json FROM user_presets "
+            "WHERE user_id = ? AND is_active = 1 LIMIT 1",
+            (user_id,),
+        ).fetchone()
+        conn.close()
+        if row is None:
+            return None
+        try:
+            signals = json.loads(row[2])
+        except Exception:
+            signals = {"watch_history": True, "ratings": True, "reviews": True}
+        return UserPreset(name=row[0], lambda_val=row[1], signals=signals, is_active=True)
+
+    def activate_preset(self, user_id, name):
+        """Mark one preset as active, deactivating all others for this user."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "UPDATE user_presets SET is_active = 0 WHERE user_id = ?",
+            (user_id,),
+        )
+        conn.execute(
+            "UPDATE user_presets SET is_active = 1 WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        conn.commit()
+        conn.close()
+
+    def deactivate_preset(self, user_id):
+        """Clear active preset — revert to profile defaults."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "UPDATE user_presets SET is_active = 0 WHERE user_id = ?",
+            (user_id,),
+        )
+        conn.commit()
+        conn.close()
+
+    def delete_preset(self, user_id, name):
+        """Delete a preset by name."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "DELETE FROM user_presets WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        conn.commit()
+        conn.close()
+
+    def update_preset(self, user_id, name, lambda_val, signals):
+        """Update an existing preset's λ and signals."""
+        conn = sqlite3.connect(str(self.db_path))
+        conn.execute(
+            "UPDATE user_presets SET lambda = ?, signals_json = ? "
+            "WHERE user_id = ? AND name = ?",
+            (lambda_val, json.dumps(signals), user_id, name),
+        )
+        conn.commit()
+        conn.close()
+

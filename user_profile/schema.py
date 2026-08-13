@@ -16,6 +16,61 @@ def _clamp(val):
 
 
 @dataclass
+class UserPreset:
+    """Lightweight named overlay — stores λ + signal toggles without touching
+    the main profile's learned affinities or history."""
+
+    name: str = "Default"
+    lambda_val: float = 0.7
+    # Per-signal on/off toggles.  True = signal feeds into recommender.
+    signals: Dict[str, bool] = field(default_factory=lambda: {
+        "watch_history": True,
+        "ratings": True,
+        "reviews": True,
+    })
+    is_active: bool = False
+
+    # Segmented-control labels → λ mapping (used by the TUI)
+    LAMBDA_LEVELS = {
+        "off": 0.0,
+        "subtle": 0.25,
+        "balanced": 0.5,
+        "strong": 0.7,
+        "maximum": 1.0,
+    }
+
+    @classmethod
+    def lambda_to_label(cls, val):
+        """Return the closest segmented-control label for a λ float."""
+        best_label, best_dist = "balanced", 999.0
+        for label, lv in cls.LAMBDA_LEVELS.items():
+            dist = abs(lv - val)
+            if dist < best_dist:
+                best_label, best_dist = label, dist
+        return best_label
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "lambda_val": self.lambda_val,
+            "signals": dict(self.signals),
+            "is_active": self.is_active,
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(
+            name=data.get("name", "Default"),
+            lambda_val=data.get("lambda_val", 0.7),
+            signals=data.get("signals", {
+                "watch_history": True,
+                "ratings": True,
+                "reviews": True,
+            }),
+            is_active=data.get("is_active", False),
+        )
+
+@dataclass
 class UserProfile:
 
     # identity & config

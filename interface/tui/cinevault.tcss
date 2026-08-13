@@ -746,3 +746,230 @@ LoadingIndicator {
     border: tall $primary;
     color: $foreground;
 }
+
+/* ── STATUS CHIP ─────────────────────────────────────────────── */
+
+#status-chip {
+    height: 1;
+    padding: 0 2;
+    background: $surface;
+    color: $foreground-muted;
+    text-style: none;
+    text-align: right;
+    dock: bottom;
+}
+
+/* ── PROFILE SWITCHER SCREEN ─────────────────────────────────── */
+
+#switcher-wrapper {
+    background: $background;
+}
+
+#switcher-container {
+    background: $background;
+    padding: 1 2;
+}
+
+#switcher-title {
+    color: $foreground;
+    text-style: bold;
+    text-align: center;
+    height: 1;
+    margin-bottom: 1;
+}
+
+#switcher-scroll-body {
+    height: 1fr;
+    margin-bottom: 1;
+    background: $background;
+}
+
+.switcher-hint {
+    color: $foreground-muted;
+    text-style: italic;
+    margin-bottom: 1;
+}
+
+.switcher-empty {
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+#switcher-buttons {
+    height: auto;
+    align: right middle;
+    border-top: solid $foreground-muted 25%;
+    margin-top: 1;
+}
+
+/* Profile rows in switcher */
+.profile-row {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $surface;
+    margin: 0 0 1 0;
+}
+
+.profile-row-current {
+    background: $primary-muted;
+}
+
+.profile-row-text {
+    width: 1fr;
+    color: $foreground;
+    text-style: none;
+}
+
+.profile-switch-btn {
+    background: $surface;
+    color: $foreground-muted;
+    border: none;
+    text-style: none;
+    min-width: 10;
+}
+
+.profile-switch-btn:hover {
+    background: $panel;
+    color: $foreground;
+}
+
+.profile-switch-btn.-active-profile {
+    background: $primary;
+    color: #06305F;
+    text-style: bold;
+}
+
+#new-profile-bar {
+    height: auto;
+    padding: 0 0;
+    margin-top: 1;
+}
+
+/* ── PROFILE SCREEN — ADDITIONAL STYLES ──────────────────────── */
+
+.section-hint {
+    color: $foreground-muted;
+    text-style: italic;
+    margin-bottom: 1;
+}
+
+/* Identity card */
+#identity-card {
+    background: $surface;
+    color: $foreground;
+    padding: 1 2;
+    margin: 0 0 1 0;
+    text-style: none;
+}
+
+/* Signal toggle rows */
+.signal-toggle-row {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+}
+
+Switch {
+    background: $surface;
+    color: $foreground-muted;
+    margin-left: 2;
+}
+
+Switch:focus {
+    color: $primary;
+}
+
+Switch.-on {
+    color: $primary;
+}
+
+/* Preset rows */
+.preset-row {
+    height: 3;
+    padding: 0 1;
+    align: left middle;
+    background: $surface;
+    margin: 0 0 1 0;
+}
+
+.preset-row-active {
+    background: $primary-muted;
+}
+
+.preset-row-text {
+    width: 1fr;
+    color: $foreground;
+    text-style: none;
+}
+
+.preset-use-btn {
+    background: $surface;
+    color: $foreground-muted;
+    border: none;
+    text-style: none;
+    min-width: 8;
+}
+
+.preset-use-btn:hover {
+    background: $panel;
+    color: $foreground;
+}
+
+.preset-use-btn.-active-profile {
+    background: $primary;
+    color: #06305F;
+    text-style: bold;
+}
+
+.preset-empty {
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+#preset-add-bar {
+    height: auto;
+    padding: 0 0;
+    margin-top: 1;
+}
+
+/* Taste columns */
+#taste-columns {
+    height: auto;
+    min-height: 8;
+    margin: 0;
+}
+
+.taste-column {
+    width: 1fr;
+    padding: 0 1;
+}
+
+.taste-column-title {
+    color: $foreground;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.taste-entry {
+    color: $foreground-muted;
+    text-style: none;
+    height: 1;
+}
+
+.taste-empty {
+    color: $foreground-muted;
+    text-style: italic;
+}
+
+/* Danger zone */
+.danger-title {
+    color: $error;
+}
+
+#danger-buttons {
+    height: auto;
+    padding: 0 0;
+    margin-top: 1;
+}
+
