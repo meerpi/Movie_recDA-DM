@@ -1,144 +1,239 @@
-# 🎬 CineVault
+https://github.com/user-attachments/assets/8701d557-e051-4bcf-920d-c59a24a5d7ac
 
-**A GPU-accelerated, fully offline-capable, neural movie recommendation engine with a retro Terminal User Interface.**
+# CineVault
 
-Built on a 7-stage hybrid pipeline: BM25 keyword search × Tag-Genome HNSW × Dense Voyage-4-Large embeddings → Reciprocal Rank Fusion → Cross-Encoder Reranking → Personalized Score Fusion → MMR Diversity Filter.
+A local-first neural movie recommendation engine and search system with a terminal user interface (TUI).
 
----
-
-## ✨ Features
-
-- **Natural Language Search** — "atmospheric slow-burn Korean thriller with philosophical depth"
-- **3-Lane Hybrid Retrieval** — BM25 + Genome HNSW (1,128-dim tag vectors) + Dense Voyage ANN
-- **7-Stage Pipeline** — Router → QUL Expansion → Retrieval → Hydration → Cross-Encoder → Personalization → MMR
-- **Fully Offline Mode** — Works without any API keys (BM25 + Genome only)
-- **GPU Reranking** — BAAI/bge-reranker-v2-m3 (fp16 autocast) or Qwen3-Reranker-4B Q4 GGUF
-- **3-Tier Movie Coverage** — 9,526 (Tier A rich) + 4,290 (Tier B genome) + 27,278 (Tier C catalog)
-- **Personalization** — Multi-dimensional user profile (genre/tone/tag/pacing/actor/director affinities)
-- **Surgical Review System** — Checkbox-based aspect tagging + optional free-text review (LLM or local RapidFuzz)
-- **Franchise Deduplication** — MMR with TMDb collection-aware diversity filter
+The engine implements a hybrid retrieval and reranking architecture: multi-lane candidate retrieval (BM25 lexical search, 1,128-dimensional Tag Genome HNSW, and 1,024-dimensional dense text embeddings) combined through Reciprocal Rank Fusion (RRF), cross-encoder neural reranking, personalized Bayesian score blending, and Maximal Marginal Relevance (MMR) diversification.
 
 ---
 
-## 🚀 Quick Start
+## Overview
 
-### 1. Clone & Setup Environment
+CineVault indexes 62,423 movies from the MovieLens 25M and TMDb datasets. It supports both free-form natural language querying and deterministic fast-path routing, running either fully offline on local CPU/GPU hardware or augmented with cloud embedding and extraction APIs.
+
+- Multi-Lane Hybrid Retrieval: Combines Okapi BM25 keyword search, cosine similarity over 1,128-dimensional MovieLens tag genome vectors, and optional 1,024-dimensional dense semantic vectors (Voyage AI).
+- Cross-Encoder Neural Reranking: Reranks candidate pools using local PyTorch cross-encoders (`BAAI/bge-reranker-v2-m3` in fp16), local 4-bit quantized GGUF models (`Qwen3-Reranker-4B`), or remote API rerankers.
+- Multi-Signal User Profiling: Tracks user preferences across genres, tags, directors, actors, pacing, tone, and release eras with exponential interaction decay, custom dealbreakers, and confidence weighting.
+- Dual-Path Review Analysis: Ingests user reviews via structured aspect checkboxes and text extraction (Gemini Flash structured JSON or local fuzzy tag matching with sarcasm heuristics).
+- Franchise-Aware Diversification: Applies Maximal Marginal Relevance (MMR) with TMDb collection grouping to prevent sequel clumping in recommendation lists.
+- Full Offline Capability: Operates without API keys by falling back to BM25, Genome HNSW, local regex-based query understanding, and local cross-encoder models.
+
+---
+
+## System Architecture
+
+```
+User Query / CLI / TUI
+  │
+  ├── 1. Query Router (nlp/router.py)
+  │     ├── Fast-Path: Association rules (Apriori co-rating patterns)
+  │     └── Fast-Path: Aggregated popularity & rating top-N queries
+  │
+  ├── 2. Query Understanding Layer (nlp/qul.py)
+  │     ├── Intent & demonym detection (e.g. language/country extraction)
+  │     ├── Concept expansion via model/concept_expansions.json
+  │     └── Gemini structured output / Local regex fallback
+  │
+  ├── 3. Candidate Retrieval (nlp/retriever.py)
+  │     ├── Lane 1: BM25 (Okapi index over titles, overviews, crew, tags)
+  │     ├── Lane 2: Tag Genome HNSW (1,128-dim vectors, cosine distance)
+  │     ├── Lane 3: Dense HNSW (1,024-dim Voyage embeddings, optional)
+  │     └── Fusion: Reciprocal Rank Fusion (RRF, k=60)
+  │
+  ├── 4. Result Hydration (nlp/hydrator.py)
+  │     └── Merges SQLite metadata with Tier A/B/C profile cards
+  │
+  ├── 5. Neural Reranker (nlp/reranker.py)
+  │     ├── Primary: BAAI/bge-reranker-v2-m3 (PyTorch fp16)
+  │     ├── Alternative: Qwen3-Reranker-4B Q4 GGUF (llama-cpp-python)
+  │     └── Fallback / API: Voyage rerank-2.5
+  │
+  ├── 6. Personalization & Scoring Fusion (nlp/pipeline.py)
+  │     ├── Bayesian rating dampening: (N*R + 100*3.2)/(N + 100)
+  │     ├── Profile boost calculation across 8 affinity vectors
+  │     ├── Lambda dial: lambda * Relevance + (1 - lambda) * ProfileBoost
+  │     └── Genre, tone contradiction, and recency penalty filters
+  │
+  └── 7. Maximal Marginal Relevance (nlp/mmr.py)
+        ├── Diversity lambda scoring
+        └── Hard cap per franchise / TMDb collection
+```
+
+---
+
+## Data Coverage Tiers
+
+The dataset is divided into three functional tiers based on metadata completeness:
+
+| Tier | Count | Description | Available Metadata |
+|------|-------|-------------|-------------------|
+| Tier A | 9,526 | High-interest / popular catalog | Rich profile cards: themes, tone, pacing, directorial style notes, standout performances, notable criticisms, comparable films, dense embeddings. |
+| Tier B | 4,290 | Mid-tail MovieLens catalog | 1,128-dimensional Tag Genome vectors, scraped Wikipedia summaries, IMDb user reviews, and TMDb metadata. |
+| Tier C | 48,607 | Long-tail global catalog | Core database records: title, release year, runtime, genres, aggregated rating stats, TMDb overview, and keyword tokens. |
+
+---
+
+## Quick Start
+
+### 1. Environment Setup
 
 ```bash
-git clone <repo>
+git clone <repository_url>
 cd movie_rec
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Required API Keys (Optional but recommended)
+### 2. Environment Variables (Optional)
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root to enable remote APIs:
 
 ```env
-VOYAGE_API_KEY=your_voyage_ai_key_here   # For Dense HNSW lane (optional)
-GEMINI_API_KEY=your_gemini_key_here      # For LLM review extraction (optional)
+# Optional: Enables Dense HNSW retrieval lane and cloud reranking
+VOYAGE_API_KEY=your_voyage_key_here
+
+# Optional: Enables LLM-driven query understanding and review parsing
+GEMINI_API_KEY=your_gemini_key_here
+
+# Optional: Fallback for LLM extraction
+OPENAI_API_KEY=your_openai_key_here
 ```
 
-Without API keys, the engine runs fully offline using BM25 + Genome HNSW (2 of 3 retrieval lanes).
+If no keys are provided, the application runs offline using BM25, Tag-Genome HNSW, local QUL rules, and local cross-encoder models.
 
-### 3. Launch the TUI
+### 3. Diagnostics and Pre-Flight Check
+
+Run the system health check to verify database integrity, indices, and GPU availability:
 
 ```bash
-python main.py                          # Interactive TUI (default)
-python main.py --user alice             # Launch as specific user
-python main.py --check-health           # Run system diagnostics
-python main.py --onboard --user alice   # Cold-start onboarding wizard
-python main.py --query "dark sci-fi"    # CLI search (no TUI)
-python main.py --query "dark sci-fi" --json  # JSON output
+python main.py --check-health
 ```
 
----
-
-## 🏗️ Architecture
-
-```
-main.py
-  └── CineVaultController (interface/controller.py)
-        ├── CineVaultPipeline (nlp/pipeline.py)
-        │     ├── QueryRouter          — fast-path association rules / top-N
-        │     ├── QueryUnderstandingLayer (QUL) — spaCy + RapidFuzz expansion
-        │     ├── CineVaultRetriever  — BM25 + Genome HNSW + Dense HNSW (RRF)
-        │     ├── ResultHydrator      — SQLite + profile card enrichment
-        │     ├── CineVaultReranker   — BAAI bge-reranker or Qwen3 Q4
-        │     ├── PersonalizationFusion — λ-dial blend (query ↔ profile)
-        │     └── MaximalMarginalRelevance — diversity filter + franchise cap
-        ├── UserProfileStore (user_profile/store.py)
-        └── LLMReviewProcessor (user_profile/review_processor.py)
-              ├── Path A: Surgical checkbox credit assignment
-              ├── Gemini Flash LLM extraction (if API key set)
-              └── Path B: Local RapidFuzz fuzzy tag fallback
-```
-
----
-
-## ⌨️ TUI Keyboard Shortcuts
-
-| Key | Action |
-|-----|--------|
-| `Ctrl+S` | Focus search input |
-| `Ctrl+O` | Profile switcher (switch/create users) |
-| `Ctrl+P` | Profile settings (λ, presets, memory) |
-| `Enter` | Inspect selected movie |
-| `R` | Review selected movie |
-| `Escape` | Close modal / go back |
-| `Ctrl+Q` | Quit |
-
----
-
-## 📁 Data Pipeline Build Order
-
-> Run these scripts once to build all indexes from the raw MovieLens / TMDB data:
+### 4. Running the Application
 
 ```bash
-python etl/load_movielens.py          # Load MovieLens 25M ratings
-python etl/load_metadata.py           # Load TMDB metadata
-python etl/enrich_database.py         # Compute movie stats, genres
-python etl/compute_stats_and_rules.py # Association rules + popularity stats
-python build_tier_a.py               # Build Tier A profile cards (LLM)
-python build_tier_b.py               # Build Tier B genome cards
-python build_tier_c.py               # Build Tier C catalog cards
-python backfill_tier_a_genome.py     # Backfill genome vectors into Tier A
-python nlp/build_bm25.py             # Build BM25 index
-python nlp/build_genome_hnsw.py      # Build Genome HNSW index
-python nlp/embed_tier_a.py           # Embed Tier A cards with Voyage AI
-python nlp/build_dense_hnsw.py       # Build Dense HNSW index
+# Launch interactive Terminal User Interface (TUI)
+python main.py
+
+# Launch TUI under a specific profile
+python main.py --user alice
+
+# Run a cold-start onboarding wizard for a new user
+python main.py --onboard --user alice
+
+# Run a CLI search query without opening the TUI
+python main.py --query "atmospheric slow-burn psychological thriller"
+
+# Output CLI search results as JSON
+python main.py --query "neo-noir detective" --top-k 5 --json
+
+# View or interactively edit stored user profile preferences
+python main.py --show-profile --user alice
+python main.py --edit-profile --user alice
 ```
 
 ---
 
-## 🔧 Configuration
+## TUI Keybindings
 
-- **Personalization λ dial** — Exposed in TUI controls bar (0.0 = pure profile, 1.0 = pure query)
-- **Concept Expansions** — `model/concept_expansions.json` — extend without code changes
-- **Profile Card Config** — `model/profile_card_config.json`
+The Terminal User Interface is implemented with Textual.
+
+| Shortcut | Context | Action |
+|----------|---------|--------|
+| `Ctrl+S` | Global | Focus the search input bar |
+| `Ctrl+P` | Global | Open User Profile and Settings modal (manage presets, sensitivity weights, dealbreakers) |
+| `Ctrl+O` | Global | Open Profile Switcher (switch active user or create new profile) |
+| `Enter` | Search Results | Inspect detailed profile card for the highlighted film |
+| `R` | Search Results / Inspector | Open interactive Review modal for the highlighted film |
+| `Escape` | Modals / Screens | Close active modal, drawer, or screen |
+| `Ctrl+Q` | Global | Exit application |
 
 ---
 
-## 🔮 Future Scope
+## Scoring & Personalization
 
-- **Profile ↔ Scoring Pipeline Wiring** — The profile system (presets, signal toggles, learned taste display) is built as UI + DB but not yet wired into the actual recommendation scoring. The λ slider works (it's passed as `personalization_lambda` to the pipeline), but the per-signal toggles (Watch History / Ratings / Reviews on/off) don't yet gate their respective scoring components. This is the next step.
-- **Preset-driven re-search** — When activating a preset, auto-re-run the current query so results update immediately.
-- **Profile export/import** — JSON export of profiles + presets for backup or sharing.
+Final candidate ranking combines neural relevance, overall ratings, and user profile affinities:
+
+- Relevance & Quality: Combines normalized cross-encoder rerank scores with Bayesian-damped ratings.
+- Personalization Dial (λ): Blends query relevance and user taste profile (0.0 = pure profile, 1.0 = pure query relevance).
+- Contextual Rules: Applies scoring modifiers for national origin (demonym matching), genre constraints, tone consistency, and release era decay.
 
 ---
 
-## 📦 Key Dependencies
+## Data Pipeline Build Steps
 
-| Package | Purpose |
-|---------|---------|
-| `textual` | Terminal User Interface framework |
-| `hnswlib` | HNSW approximate nearest-neighbour index |
-| `rank_bm25` | BM25 keyword search |
-| `sentence-transformers` | BAAI cross-encoder reranker |
-| `spacy` | EntityRuler for query parsing |
-| `rapidfuzz` | Fuzzy string matching for QUL & review processing |
-| `voyageai` | Dense text embeddings (optional) |
-| `google-genai` | Gemini LLM for review extraction (optional) |
-| `torch` | PyTorch for GPU reranker inference |
+To rebuild the database, feature stores, and index files from raw MovieLens 25M and TMDb data:
+
+```bash
+# 1. Load raw datasets into SQLite
+python etl/load_movielens.py
+python etl/load_metadata.py
+python etl/load_genome_vectors.py
+
+# 2. Compute aggregate statistics and association rules
+python etl/enrich_database.py
+python etl/compute_stats_and_rules.py
+
+# 3. Build tiered profile cards
+python build_tier_a.py
+python build_tier_b.py
+python build_tier_c.py
+python dirtywork/backfill_tier_a_genome.py
+
+# 4. Compile search indices
+python dirtywork/build_bm25.py
+python dirtywork/build_genome_hnsw.py
+python dirtywork/embed_tier_a.py
+python dirtywork/build_dense_hnsw.py
+```
+
+---
+
+## Repository Structure
+
+```
+movie_rec/
+├── main.py                     # CLI entry point, argument parser, and health checks
+├── schema.sql                  # Canonical SQLite schema definition
+├── requirements.txt            # Python dependencies
+├── interface/
+│   ├── controller.py           # State management, caching, and pipeline orchestration
+│   └── tui/                    # Textual user interface implementation
+│       ├── app.py              # Main Textual App class and theme bindings
+│       ├── cinevault.tcss      # Phosphor dark terminal styling sheet
+│       ├── screens/            # Search, Profile, and Profile Switcher screens
+│       └── modals/             # Movie Inspector, Review, and Onboarding dialogs
+├── nlp/
+│   ├── pipeline.py             # End-to-end recommendation pipeline execution
+│   ├── router.py               # Deterministic query router and association rule lookup
+│   ├── qul.py                  # Query Understanding Layer (LLM + local fallback)
+│   ├── retriever.py            # 3-lane RRF candidate retriever (BM25 + Genome + Dense)
+│   ├── hydrator.py             # Result metadata hydration from SQLite and JSONL
+│   ├── reranker.py             # Cross-encoder reranker (BGE-M3 / Qwen3 GGUF)
+│   ├── mmr.py                  # Maximal Marginal Relevance diversification
+│   └── ltr_scorer.py           # Optional Learning-to-Rank (XGBoost) scoring path
+├── user_profile/
+│   ├── schema.py               # UserProfile, UserPreset, and affinity vector data classes
+│   ├── store.py                # Optimistic-concurrency SQLite storage for profiles
+│   ├── identity.py             # Profile validation and anchor movie resolution
+│   └── review_processor.py     # Aspect credit assignment & sarcasm detection
+├── etl/                        # Raw data loading, enrichment, and statistics scripts
+├── model/                      # Configuration files, concept expansions, and LTR models
+└── dirtywork/                  # HNSW indices, BM25 pickles, and dataset jsonl files
+```
+
+---
+
+## Dependencies
+
+- Textual: Terminal User Interface runtime
+- PyTorch: Tensor operations and GPU acceleration for cross-encoders
+- Sentence-Transformers: Cross-encoder reranking (`BAAI/bge-reranker-v2-m3`)
+- hnswlib: Approximate Nearest Neighbors index for Genome and Dense embeddings
+- rank-bm25: Lexical search index
+- llama-cpp-python: Local GGUF quantized model execution (optional)
+- RapidFuzz & spaCy: Fuzzy string matching and text processing
+- Google-GenAI / OpenAI: Optional remote LLM query understanding and review parsing
+- VoyageAI: Optional dense embeddings and cloud reranking
